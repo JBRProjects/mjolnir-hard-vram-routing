@@ -1,13 +1,13 @@
 # MJØLNIR: Memory-constrained Joint Orchestration of Layered Neural Inference Runtimes under Hard VRAM Budgets
 
-> *Whosoever routes this query, if he be worthy, shall possess the power of Thor — measured, not simulated.*
+> *Whosoever routes this query, if he be worthy, shall possess the power of Thor - measured, not simulated.*
 > Cost-aware per-query routing across heterogeneous local model tiers on fixed-VRAM hardware.
 
 Working paper title: *Cost-Aware Routing Across Heterogeneous Local Model Tiers on Fixed-VRAM Hardware*
 
 ## One-line pitch
 
-Given a fixed, small memory budget and locally-hosted models with very different cost/quality/architecture profiles (dense transformer vs hybrid SSM), learn a routing policy `r(x) -> tier` per query and measure how close it gets to the oracle Pareto frontier — using real hardware numbers.
+Given a fixed, small memory budget and locally-hosted models with very different cost/quality/architecture profiles (dense transformer vs hybrid SSM), learn a routing policy `r(x) -> tier` per query and measure how close it gets to the oracle Pareto frontier - using real hardware numbers.
 
 ## Tiers (testbed)
 
