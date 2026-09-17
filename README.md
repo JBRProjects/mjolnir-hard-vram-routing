@@ -46,3 +46,7 @@ See `SPEC.md` for formalization (tiers, budget B, router, oracle upper bound) an
 ## Status
 
 Week 1 prep: prompt set frozen (180), scoring methodology frozen (correctness primary). Harness + 3 router baselines scaffolded. Oracle collection pending live servers.
+
+## Note
+
+Just in clear it wasn't obvious - MJOLNIR is a play on words, not an actual hammer. :)
