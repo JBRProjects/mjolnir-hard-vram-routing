@@ -3,8 +3,25 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+# generated outputs (local only, real numbers stay local until published)
 harness/oracle.jsonl
 scoring/scores.jsonl
 router/learned_preds.jsonl
 analysis/cost_quality.png
 analysis/table.md
+# proprietary engine + weights — NEVER push (closed for now)
+*.exe
+*.dll
+*.gguf
+*.bin
+*.pt
+*.safetensors
+*.obj
+*.pdb
+core/
+modern_backend/
+jayvis/
+build-jve/
+dist/
+*.marker
+jayvis.cfg
