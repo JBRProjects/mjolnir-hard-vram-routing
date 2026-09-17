@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+harness/oracle.jsonl
+scoring/scores.jsonl
+router/learned_preds.jsonl
+analysis/cost_quality.png
+analysis/table.md
