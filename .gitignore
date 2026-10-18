@@ -5,10 +5,13 @@ __pycache__/
 venv/
 # generated outputs (local only, real numbers stay local until published)
 harness/oracle.jsonl
+harness/oracle_smoke.jsonl
 scoring/scores.jsonl
+scoring/scores_smoke.jsonl
 router/learned_preds.jsonl
 analysis/cost_quality.png
 analysis/table.md
+analysis/__pycache__/
 # proprietary engine + weights — NEVER push (closed for now)
 *.exe
 *.dll

@@ -41,6 +41,19 @@ python router/learned.py
 python analysis/make_plot.py
 ```
 
+No live servers yet? Exercise the full pipeline with deterministic synthetic
+tier outputs (pipeline validation only — NOT for RESULTS.md numbers):
+
+```bash
+python harness/run_oracle.py --out harness/oracle_smoke.jsonl --mock
+python scoring/score.py --in harness/oracle_smoke.jsonl --out scoring/scores_smoke.jsonl
+python router/learned.py --scores scoring/scores_smoke.jsonl
+python analysis/make_plot.py --scores scoring/scores_smoke.jsonl
+```
+
+Optional judge-based secondary scoring (SPEC §5, needs a tier up as judge,
+e.g. ultra): `python scoring/score.py --in harness/oracle.jsonl --judge-url http://127.0.0.1:8082 --judge-max 60`.
+
 See `SPEC.md` for formalization (tiers, budget B, router, oracle upper bound) and `RESULTS.md` for live numbers.
 
 ## Status
