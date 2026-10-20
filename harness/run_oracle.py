@@ -174,9 +174,10 @@ def main():
                 else:
                     n_ok += 1
             f.write(json.dumps(rec) + "\n")
+            f.flush()  # progress visible to pollers even when stdout is redirected (block-buffered)
             if (i + 1) % 10 == 0:
-                print(f"[harness] {i+1}/{len(rows)} prompts done")
-    print(f"[harness] wrote {out_p} ({len(rows)} prompts, {n_ok} successful tier-runs)")
+                print(f"[harness] {i+1}/{len(rows)} prompts done", flush=True)
+    print(f"[harness] wrote {out_p} ({len(rows)} prompts, {n_ok} successful tier-runs)", flush=True)
 
 if __name__ == "__main__":
     main()

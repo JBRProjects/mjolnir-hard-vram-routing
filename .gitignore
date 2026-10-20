@@ -5,9 +5,21 @@ __pycache__/
 venv/
 # generated outputs (local only, real numbers stay local until published)
 harness/oracle.jsonl
+harness/oracle_turbo.jsonl
+harness/oracle_vector.jsonl
+harness/oracle_ultra.jsonl
+harness/oracle_*_merged.jsonl
 harness/oracle_smoke.jsonl
+harness/oracle_smoke_t.jsonl
+harness/turbo_pass.log
+harness/vector_pass.log
+harness/ultra_pass.log
+harness/*.log.err
+harness/*.pid
+harness/tier_*.log
 scoring/scores.jsonl
 scoring/scores_smoke.jsonl
+scoring/scores_*_merged.jsonl
 router/learned_preds.jsonl
 analysis/cost_quality.png
 analysis/table.md

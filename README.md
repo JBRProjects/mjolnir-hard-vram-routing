@@ -35,13 +35,23 @@ RESULTS.md     # numbers as they land
 
 ```bash
 python eval_prompts/build_prompts.py
-python harness/run_oracle.py --prompts eval_prompts/prompts.jsonl --out harness/oracle.jsonl
+# live collection: one tier resident at a time (4GB VRAM class), uniform eval operating point
+powershell -File harness/bringup.ps1 -Tier turbo  -EvalCtx 2048   # wait for HEALTHY
+python harness/run_oracle.py --prompts eval_prompts/prompts.jsonl --out harness/oracle_turbo.jsonl  --tiers turbo  --n-predict 128 --timeout 300
+powershell -File harness/bringup.ps1 -Tier turbo -Kill
+powershell -File harness/bringup.ps1 -Tier vector -EvalCtx 2048
+python harness/run_oracle.py --prompts eval_prompts/prompts.jsonl --out harness/oracle_vector.jsonl --tiers vector --n-predict 128 --timeout 600
+powershell -File harness/bringup.ps1 -Tier vector -Kill
+powershell -File harness/bringup.ps1 -Tier ultra  -EvalCtx 2048
+python harness/run_oracle.py --prompts eval_prompts/prompts.jsonl --out harness/oracle_ultra.jsonl  --tiers ultra  --n-predict 128 --timeout 600
+powershell -File harness/bringup.ps1 -Tier ultra -Kill
+python harness/merge_tiers.py --out harness/oracle.jsonl
 python scoring/score.py --in harness/oracle.jsonl --out scoring/scores.jsonl
 python router/learned.py
 python analysis/make_plot.py
 ```
 
-No live servers yet? Exercise the full pipeline with deterministic synthetic
+No live servers? Exercise the full pipeline with deterministic synthetic
 tier outputs (pipeline validation only — NOT for RESULTS.md numbers):
 
 ```bash
@@ -58,7 +68,10 @@ See `SPEC.md` for formalization (tiers, budget B, router, oracle upper bound) an
 
 ## Status
 
-Week 1 prep: prompt set frozen (180), scoring methodology frozen (correctness primary). Harness + 3 router baselines scaffolded. Oracle collection pending live servers.
+Oracle collected (540/540 tier-runs successful, zero errors): tier characterization + all four
+router policies measured on held-out data. Main caveat recorded in RESULTS.md — the frozen
+correctness metric favors turbo's answer formatting, so the oracle mostly selects turbo and the
+achievable gap is small; judge-based/secondary quality scoring is the next cycle's priority.
 
 ## Note
 
