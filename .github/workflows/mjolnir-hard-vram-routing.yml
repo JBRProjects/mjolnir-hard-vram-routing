@@ -1,36 +1,71 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  pipeline-smoke:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Install deps
+        run: python -m pip install --quiet requests scikit-learn matplotlib
+
+      - name: Compile check
+        run: >-
+          python -m py_compile
+          eval_prompts/build_prompts.py
+          harness/run_oracle.py
+          harness/merge_tiers.py
+          scoring/score.py
+          router/heuristic.py
+          router/cascade.py
+          router/learned.py
+          analysis/make_plot.py
+
+      - name: Unit check - scoring + routers
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          python - <<'EOF'
+          import sys; sys.path.insert(0, '.')
+          from scoring.score import score_factual, score_code, score_reasoning
+          from router.heuristic import route
+          from router.cascade import confidence_proxy, cascade
+          assert score_factual("The answer is Paris.", "Paris") == 1.0
+          assert score_factual("The answer is London.", "Paris") == 0.0
+          assert score_code("```python\ndef add(a, b):\n    return a + b\n```", "def add(a, b):\n    return a + b") == 1.0
+          assert score_code("def broken(a, b:\n    return a + b", "") == 0.0
+          assert score_reasoning("x " * 30 + "\nAnswer: 42", "") == 0.75
+          assert route("Write Python factorial(n). Output code only.") in ("turbo", "vector")
+          assert route("Why is the sky blue? Explain the steps.") == "ultra"
+          assert confidence_proxy("") == 0.0
+          assert cascade({"turbo": 0.9}) == "turbo"
+          assert cascade({"turbo": 0.0, "vector": 0.0}) == "ultra"
+          print("unit checks OK")
+          EOF
+
+      - name: Mock pipeline end-to-end
+        run: |
+          python harness/run_oracle.py --out harness/oracle_smoke.jsonl --mock
+          python scoring/score.py --in harness/oracle_smoke.jsonl --out scoring/scores_smoke.jsonl
+          python router/learned.py --scores scoring/scores_smoke.jsonl
+          python analysis/make_plot.py --scores scoring/scores_smoke.jsonl
+          python - <<'EOF'
+          import json, pathlib
+          scores = [json.loads(l) for l in pathlib.Path('scoring/scores_smoke.jsonl').read_text().splitlines() if l.strip()]
+          assert len(scores) == 180, len(scores)
+          assert all(r.get('prompt') for r in scores), "prompt passthrough missing"
+          assert all('confidence' in (r['tiers'][t] or {}) for r in scores for t in r['tiers']), "confidence missing"
+          table = pathlib.Path('analysis/table.md').read_text()
+          for name in ('random', 'heuristic', 'cascade', 'learned', 'oracle'):
+              assert name in table, name
+          print("pipeline checks OK")
+          EOF
