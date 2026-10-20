@@ -40,3 +40,4 @@ build-jve/
 dist/
 *.marker
 jayvis.cfg
+scoring/scores_turbo_preview.jsonl
