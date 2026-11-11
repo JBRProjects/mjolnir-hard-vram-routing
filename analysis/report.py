@@ -98,6 +98,18 @@ def main():
         n = dist.get(t, 0)
         A(f"| {t} | {n} | {n/max(1,len(rows)):.3f} |")
 
+    # per-task oracle distribution: which tier is worth paying for on which task
+    A("\n### Oracle tier distribution per task\n")
+    A("| task | " + " | ".join(TIER_ORDER) + " |")
+    A("|---|" + "---|" * len(TIER_ORDER))
+    per_task_oracle = collections.defaultdict(collections.Counter)
+    for r in rows:
+        per_task_oracle[r["task"]][r.get("oracle")] += 1
+    for task in sorted(per_task_oracle):
+        c = per_task_oracle[task]
+        tot = sum(c.values())
+        A(f"| {task} | " + " | ".join(f"{c.get(t,0)} ({c.get(t,0)/max(1,tot):.2f})" for t in TIER_ORDER) + " |")
+
     # router comparison
     from router import heuristic, cascade
     preds = {}
