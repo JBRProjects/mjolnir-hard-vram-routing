@@ -34,6 +34,7 @@ jobs:
           router/heuristic.py
           router/cascade.py
           router/learned.py
+          router/budget_router.py
           analysis/make_plot.py
           tests/test_mjolnir.py
 
@@ -83,7 +84,8 @@ jobs:
           python eval_prompts/build_prompts_v2.py --out eval_prompts/prompts_v2.jsonl
           python harness/run_oracle.py --prompts eval_prompts/prompts_v2.jsonl --out harness/oracle_smoke_v2.jsonl --mock
           python scoring/score.py --in harness/oracle_smoke_v2.jsonl --out scoring/scores_smoke_v2.jsonl --metric v2
-          python router/learned.py --scores scoring/scores_smoke_v2.jsonl
+          python router/learned.py --scores scoring/scores_smoke_v2.jsonl --ablation
+          python router/budget_router.py --scores scoring/scores_smoke_v2.jsonl
           python analysis/make_plot.py --scores scoring/scores_smoke_v2.jsonl
           python - <<'EOF'
           import json, pathlib
@@ -94,5 +96,8 @@ jobs:
           table = pathlib.Path('analysis/table.md').read_text()
           for name in ('random', 'heuristic', 'cascade', 'cascade-verified', 'learned', 'oracle'):
               assert name in table, name
+          assert 'quality/cost frontier' in table, "budget curve missing"
+          curve = json.loads(pathlib.Path('router/budget_curve.json').read_text())
+          assert len(curve) >= 3, curve
           print("v2 pipeline checks OK")
           EOF

@@ -137,6 +137,22 @@ def main():
         n = dist.get(t, 0)
         md += f"| {t} | {n} | {n/max(1,len(test)):.3f} |\n"
 
+    # cost-aware learned router: quality/cost Pareto curve (SPEC section 4)
+    curve = []
+    try:
+        from router import budget_router
+        curve, lat, note = budget_router.curve(rows)
+        print(f"[budget] cost-aware learned router ({note})")
+    except Exception as e:                       # pragma: no cover - optional
+        print(f"[budget] curve unavailable: {e}")
+    if curve:
+        md += "\n## Cost-aware learned router: quality/cost frontier\n\n"
+        md += "| cost penalty lambda | avg cost (ms) | quality | tier mix |\n|---|---|---|---|\n"
+        for p in curve:
+            mix = ", ".join(f"{t}:{p['mix'][t]}" for t in TIER_ORDER)
+            md += f"| {p['lambda']:.2f} | {p['cost_ms']:.1f} | {p['quality']:.3f} | {mix} |\n"
+        (BASE / "router" / "budget_curve.json").write_text(json.dumps(curve, indent=1), encoding="utf-8")
+
     (BASE / "analysis" / "table.md").write_text(md, encoding="utf-8")
     print("wrote analysis/table.md")
     try:
@@ -144,6 +160,10 @@ def main():
         fig, ax = plt.subplots()
         for k, (c, q) in pts.items():
             ax.scatter([c], [q]); ax.annotate(k, (c, q))
+        if curve:
+            ax.plot([p["cost_ms"] for p in curve], [p["quality"] for p in curve],
+                    marker="o", linestyle="--", color="gray", label="cost-aware learned router")
+            ax.legend()
         ax.set_xlabel("avg cost (ms)"); ax.set_ylabel("avg quality")
         ax.set_title("Routing cost vs quality (test split)")
         fig.savefig(BASE / "analysis" / "cost_quality.png", dpi=150)
