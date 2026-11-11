@@ -111,10 +111,13 @@ def _candidates(text: str, task: str):
 
 
 def _gold_in_text(gold: str, text: str) -> bool:
-    """Lenient fallback: the gold answer appears in the trimmed output.
+    """Lenient fallback: the gold answer appears in a *declarative* sentence.
 
     Only used for short, non-numeric golds (a stray "2" anywhere in an answer
-    would otherwise be a false positive).
+    would otherwise be a false positive). Questions are skipped on purpose:
+    the vector tier was trained on Q&A text and invents further questions after
+    answering, and a gold string inside one of those invented questions is not
+    the model asserting the answer.
     """
     if not gold or not text:
         return False
@@ -123,8 +126,13 @@ def _gold_in_text(gold: str, text: str) -> bool:
         return False
     if any(t.replace(".", "", 1).isdigit() for t in gt):
         return False
-    tt = set(normalize_answer(text).split())
-    return all(t in tt for t in gt)
+    for sent in re.split(r"(?<=[.!?])\s+", text.strip()):
+        if sent.rstrip().endswith("?"):
+            continue
+        tt = set(normalize_answer(sent).split())
+        if all(t in tt for t in gt):
+            return True
+    return False
 
 
 def v2_factual(output, reference):
