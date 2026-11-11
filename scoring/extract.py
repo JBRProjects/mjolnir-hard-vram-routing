@@ -68,11 +68,17 @@ def trim_continuation(text: str) -> str:
 _FENCE_RE = re.compile(r"```(?:python|py)?[ \t]*\n?(.*?)(?:```|$)", re.S)
 
 
-def extract_code(text: str) -> str:
+def extract_code(text: str, fn=None) -> str:
     """Return the candidate program from a model answer.
 
-    Order: fenced block -> first `def`/`import`/`class` span. Prose around the
-    code is dropped so that scoring measures behaviour, not formatting.
+    Order: fenced block -> the definition of `fn` (when known) -> the first
+    code-looking span. Prose around the code is dropped so that scoring
+    measures behaviour, not formatting.
+
+    The `fn` argument matters: the tiers often prefix the program with a
+    sentence that itself contains code words ("No need to import any module.
+    ... def is_prime(n):"), so anchoring on the requested function is the only
+    reliable way to find where the program starts.
     """
     text = trim_continuation(text)
     if not text:
@@ -84,20 +90,29 @@ def extract_code(text: str) -> str:
             if re.search(r"^\s*(def |class |import |from )", b, re.M):
                 return b.strip()
         return blocks[0].strip()
-    lines = text.splitlines()
     start = None
-    for i, line in enumerate(lines):
-        if re.match(r"^\s*(def |class |import |from )", line):
-            start = i
-            break
+    if fn:
+        m = re.search(rf"\b(?:def|class)\s+{re.escape(fn)}\b", text)
+        if m:
+            start = m.start()
+    if start is None:
+        lines = text.splitlines()
+        offset = 0
+        for line in lines:
+            if re.match(r"^\s*(def |class |import |from )", line):
+                start = offset
+                break
+            offset += len(line) + 1
+    if start is None:
+        m = re.search(r"\bdef\s+[A-Za-z_]\w*\s*\(", text)
+        if m:
+            start = m.start()
     if start is None:
         return ""
-    out = []
-    for line in lines[start:]:
-        if re.match(r"^(Human|User|Assistant)\s*:", line):
-            break
-        out.append(line)
-    return "\n".join(out).strip()
+    code = text[start:]
+    # a trailing prose line after the program is harmless: repair_code() trims
+    # the candidate back to the longest prefix that parses.
+    return code.strip()
 
 
 def repair_code(code: str, fn=None) -> str:

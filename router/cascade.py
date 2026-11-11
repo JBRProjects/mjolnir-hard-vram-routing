@@ -78,9 +78,9 @@ def gate(task: str, content: str, fn=None, tests=None) -> bool:
     from scoring.extract import extract_answer, extract_code, repair_code
     if task == "code_gen":
         if not tests:
-            return bool(extract_code(content).strip())
+            return bool(extract_code(content, fn).strip())
         from scoring.exec_tests import run_tests
-        code = repair_code(extract_code(content), fn)
+        code = repair_code(extract_code(content, fn), fn)
         if not code.strip():
             return False
         r = run_tests(code, fn, tests)

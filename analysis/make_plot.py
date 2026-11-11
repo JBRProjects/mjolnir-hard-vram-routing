@@ -57,6 +57,11 @@ def main():
     from router import heuristic, cascade
     preds = load_learned_preds()
     if preds:
+        test_ids = {r.get("id") for r in test}
+        missing = len(test_ids - set(preds))
+        if missing:
+            print(f"[router] WARNING: router/learned_preds.jsonl does not cover {missing} test row(s) "
+                  f"- re-run router/learned.py --scores {scores_path}")
         n_correct = sum(1 for r in test if preds.get(r.get("id")) == r["oracle"])
         print(f"[router] learned: {len(preds)} predictions, oracle-agreement {n_correct/max(1,len(test)):.3f} on test")
     else:

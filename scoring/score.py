@@ -115,7 +115,7 @@ def v2_code(output, reference, fn=None, tests=None):
     task carries no unit tests (e.g. cycle-1 oracle data)."""
     if not tests:
         return score_code(output, reference), None
-    code = repair_code(extract_code(output), fn)
+    code = repair_code(extract_code(output, fn), fn)
     if not code.strip():
         return 0.0, {"error": "no code extracted"}
     from scoring.exec_tests import run_tests
@@ -275,6 +275,7 @@ def main():
     for r in rows:
         scored = {"id": r["id"], "task": r["task"], "split": r.get("split", ""),
                   "prompt": r.get("prompt", ""), "metric": args.metric,
+                  "reference": r.get("reference", ""),
                   "fn": r.get("fn"), "tests": r.get("tests"), "tiers": {}}
         for tier, t in r.get("tiers", {}).items():
             content = t.get("content", "")
