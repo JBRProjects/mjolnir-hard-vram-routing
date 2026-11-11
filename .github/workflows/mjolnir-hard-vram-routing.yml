@@ -36,6 +36,8 @@ jobs:
           router/learned.py
           router/budget_router.py
           analysis/make_plot.py
+          analysis/report.py
+          analysis/tier_table.py
           tests/test_mjolnir.py
 
       - name: Unit checks (extraction, execution scoring, routers, eval set)
