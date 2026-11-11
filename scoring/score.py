@@ -133,31 +133,45 @@ JUDGE_TMPL = ("You are a strict grader. Question: {q}\nExpected answer: {ref}\n"
               "relative to the expected answer? Reply with exactly YES or NO.")
 
 
-def judge_once(url, prompt_text, timeout=60):
-    """One ultra-as-judge call. Returns 'yes'/'no', or None on any failure."""
+def judge_once(url, prompt_text, timeout=120):
+    """One ultra-as-judge call. Returns 'yes'/'no', or None on any failure.
+
+    The judge tier is a completion-style model, so it may prepend a remark
+    before the verdict; the first standalone YES/NO word in the reply is taken
+    as the verdict (and anything else is treated as a failed call, never as a
+    silent NO).
+    """
     try:
         import requests
     except ImportError:
         return None
     try:
         r = requests.post(url.rstrip("/") + "/completion", json={
-            "prompt": prompt_text, "n_predict": 4, "temperature": 0.0,
+            "prompt": prompt_text, "n_predict": 8, "temperature": 0.0,
             "stream": False, "cache_prompt": False,
         }, timeout=timeout)
         if r.status_code != 200:
             return None
-        reply = r.json().get("content", "").strip().upper()
-        if reply.startswith("YES"): return "yes"
-        if reply.startswith("NO"): return "no"
-        return None
+        reply = r.json().get("content", "")
+        m = re.search(r"\b(YES|NO)\b", reply.upper())
+        if not m:
+            return None
+        return "yes" if m.group(1) == "YES" else "no"
     except Exception as e:
         print(f"[judge] call failed: {e}", file=sys.stderr)
         return None
 
 
-def run_judge(rows, url, max_calls, tasks=None):
-    """Judge score in {0.0,1.0} for tiers on prompts where the primary metric
-    disagrees (any tier above 0 next to any tier at 0)."""
+def run_judge(rows, url, max_calls, tasks=None, mode="disagree"):
+    """Judge score in {0.0,1.0} for tiers.
+
+    mode="disagree" (default): judge the tiers that scored 0 on prompts where the
+        primary metric disagrees (any tier above 0 next to any tier at 0) - the
+        use case in SPEC section 5 (resolve the disagreement with a judge).
+    mode="all": judge every tier on as many prompts as the budget allows, which
+        is how the primary metric is *validated* against a judge (agreement and
+        Cohen's kappa on the judged subset).
+    """
     from collections import defaultdict
     n = 0
     out = defaultdict(dict)   # id -> {tier: 0.0|1.0}
@@ -165,17 +179,22 @@ def run_judge(rows, url, max_calls, tasks=None):
         if n >= max_calls: break
         if tasks and r.get("task") not in tasks: continue
         tiers = r.get("tiers", [])
-        tops = [t for t, v in tiers.items() if v.get("quality", 0) > 0]
-        zeros = [t for t, v in tiers.items() if v.get("quality", 0) == 0 and not v.get("error")]
-        if not (tops and zeros):
-            continue
-        for t in zeros:
+        if mode == "all":
+            targets = [t for t in TIER_ORDER if (tiers.get(t) or {}).get("content", "").strip()]
+        else:
+            tops = [t for t, v in tiers.items() if v.get("quality", 0) > 0]
+            zeros = [t for t, v in tiers.items() if v.get("quality", 0) == 0 and not v.get("error")]
+            if not (tops and zeros):
+                continue
+            targets = zeros
+        for t in targets:
             content = tiers[t].get("content", "")
             if not content.strip(): continue
             reply = judge_once(url, JUDGE_TMPL.format(q=r.get("prompt", ""), ref=r.get("reference", ""),
                                                       cand=trim_continuation(content)[:1500]))
-            judged = 1.0 if reply == "yes" else 0.0
-            out[r["id"]][t] = judged
+            if reply is None:
+                continue
+            out[r["id"]][t] = 1.0 if reply == "yes" else 0.0
             n += 1
             if n >= max_calls: break
     return dict(out), n
@@ -203,6 +222,33 @@ def apply_gold(rows, gold_path):
     return n
 
 
+def judge_agreement(out, judged):
+    """Agreement between the primary metric and the judge on the judged subset."""
+    pairs = []
+    per_tier = {}
+    for r in out:
+        j = judged.get(r["id"])
+        if not j:
+            continue
+        for tier, jv in j.items():
+            e = r["tiers"].get(tier) or {}
+            pv = 1 if e.get("quality", 0.0) >= 0.5 else 0
+            pairs.append((pv, jv))
+            per_tier.setdefault(tier, []).append((pv, jv))
+    if not pairs:
+        return None
+    n = len(pairs)
+    agree = sum(1 for a, b in pairs if a == b) / n
+    po = agree
+    pe = 0.0
+    for a in (0, 1):
+        for b in (0, 1):
+            pe += (sum(1 for x, y in pairs if x == a) / n) * (sum(1 for x, y in pairs if y == b) / n)
+    kappa = (po - pe) / (1 - pe) if pe < 1 else 0.0
+    return {"judged": n, "agreement": agree, "kappa": kappa,
+            "per_tier": {t: (sum(1 for a, b in v if a == b) / len(v), len(v)) for t, v in per_tier.items()}}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="inp", default=str(BASE / "harness" / "oracle.jsonl"))
@@ -213,6 +259,9 @@ def main():
     ap.add_argument("--judge-url", default="", help="tier base URL to use as judge (e.g. http://127.0.0.1:8082); empty = disabled")
     ap.add_argument("--judge-max", type=int, default=60, help="cap on judge calls (latency budget)")
     ap.add_argument("--judge-tasks", nargs="*", default=None, help="restrict judging to these task types")
+    ap.add_argument("--judge-mode", choices=["disagree", "all"], default="disagree",
+                    help="disagree = judge only the tiers the primary metric marked wrong; "
+                         "all = judge every tier (metric validation against a judge)")
     args = ap.parse_args()
     rows = [json.loads(l) for l in pathlib.Path(args.inp).read_text(encoding="utf-8").splitlines() if l.strip()]
     if args.gold:
@@ -220,8 +269,8 @@ def main():
         print(f"[gold] attached gold to {n}/{len(rows)} rows from {args.gold}")
     judged = {}
     if args.judge_url:
-        judged, n_calls = run_judge(rows, args.judge_url, args.judge_max, args.judge_tasks)
-        print(f"[judge] {n_calls} calls completed ({len(judged)} prompts judged)")
+        judged, n_calls = run_judge(rows, args.judge_url, args.judge_max, args.judge_tasks, args.judge_mode)
+        print(f"[judge] {n_calls} calls completed ({len(judged)} prompts judged, mode={args.judge_mode})")
     out = []
     for r in rows:
         scored = {"id": r["id"], "task": r["task"], "split": r.get("split", ""),
@@ -272,6 +321,13 @@ def main():
         out.append(scored)
     pathlib.Path(args.out).write_text("\n".join(json.dumps(o) for o in out), encoding="utf-8")
     print(f"wrote {args.out} ({len(out)} prompts, metric={args.metric})")
+    if judged:
+        ag = judge_agreement(out, judged)
+        if ag:
+            print(f"[judge] metric agreement on {ag['judged']} judged tier-runs: "
+                  f"agreement={ag['agreement']:.3f} kappa={ag['kappa']:.3f}")
+            for tier, (a, k) in ag["per_tier"].items():
+                print(f"[judge]   {tier:7s} agreement={a:.3f} (n={k})")
 
 
 if __name__ == "__main__":
