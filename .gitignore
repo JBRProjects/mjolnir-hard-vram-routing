@@ -8,8 +8,13 @@ harness/oracle.jsonl
 harness/oracle_turbo.jsonl
 harness/oracle_vector.jsonl
 harness/oracle_ultra.jsonl
+harness/oracle_v2.jsonl
+harness/oracle_v2_turbo.jsonl
+harness/oracle_v2_vector.jsonl
+harness/oracle_v2_ultra.jsonl
 harness/oracle_*_merged.jsonl
 harness/oracle_smoke.jsonl
+harness/oracle_smoke_v2.jsonl
 harness/oracle_smoke_t.jsonl
 harness/turbo_pass.log
 harness/vector_pass.log
@@ -19,11 +24,14 @@ harness/*.pid
 harness/tier_*.log
 scoring/scores.jsonl
 scoring/scores_smoke.jsonl
+scoring/scores_smoke_v2.jsonl
+scoring/scores_v2_legacy.jsonl
 scoring/scores_*_merged.jsonl
 router/learned_preds.jsonl
 analysis/cost_quality.png
 analysis/table.md
 analysis/__pycache__/
+scoring/_selftest_v2.py
 # proprietary engine + weights — NEVER push (closed for now)
 *.exe
 *.dll

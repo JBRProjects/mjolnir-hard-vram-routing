@@ -1,22 +1,30 @@
-"""Cost-quality plot: policies (random, heuristic, cascade, learned, oracle).
+"""Cost-quality analysis: policies (random, heuristic, cascade, cascade-verified,
+learned, oracle) on the held-out test split.
+
 Reads scoring/scores.jsonl (+ router/learned_preds.jsonl from router/learned.py)
-and evaluates each policy on the held-out test rows:
-- routes decide on PROMPT TEXT (scores.jsonl carries `prompt` through)
-- cascade walks turbo->vector->ultra by per-tier confidence proxy; cost =
-  accumulated latency of every attempted tier (failed attempts still cost)
-- capture: (q_policy - q_random) / (q_oracle - q_random) on quality, per the
-  RESULTS.md table (random = floor 0%, oracle = ceiling 100%).
-Writes analysis/table.md (+ analysis/cost_quality.png if matplotlib available).
-Usage: python analysis/make_plot.py   (run after router/learned.py for the learned point)
+and evaluates each policy:
+  * routes decide on PROMPT TEXT (scores.jsonl carries `prompt` through)
+  * cascade (confidence gate) walks turbo->vector->ultra by the surface
+    confidence proxy; cost = accumulated latency of every attempted tier
+  * cascade-verified walks the same ladder but stops at the first tier that
+    passes the TASK-SPECIFIC VERIFIER (unit tests for code, answer presence for
+    QA/reasoning); cost = accumulated latency of every attempted tier
+  * capture: (q_policy - q_random) / (q_oracle - q_random) on quality
+    (random = floor 0%, oracle = ceiling 100%)
+
+Writes analysis/table.md (+ analysis/cost_quality.png if matplotlib is available)
+Usage: python analysis/make_plot.py [--scores scoring/scores.jsonl] [--split test]
 """
-import json, pathlib, random, sys
+import json, pathlib, random, sys, collections
 
 BASE = pathlib.Path(__file__).parent.parent
 SCORES_DEFAULT = BASE / "scoring" / "scores.jsonl"
 TIER_ORDER = ["turbo", "vector", "ultra"]
 
+
 def load(scores_path):
-    return [json.loads(l) for l in scores_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [json.loads(l) for l in pathlib.Path(scores_path).read_text(encoding="utf-8").splitlines() if l.strip()]
+
 
 def load_learned_preds():
     pp = BASE / "router" / "learned_preds.jsonl"
@@ -27,6 +35,15 @@ def load_learned_preds():
                 j = json.loads(l)
                 preds[j["id"]] = j["pred"]
     return preds
+
+
+def _artifact(r, tier):
+    """The candidate artefact of a tier, as carried by the scores file."""
+    e = (r.get("tiers", {}) or {}).get(tier) or {}
+    if "code" in e:
+        return e.get("code") or ""
+    return e.get("answer") or ""
+
 
 def main():
     sys.path.insert(0, str(BASE))
@@ -59,6 +76,14 @@ def main():
                 break
         return chosen, total
 
+    def cascade_verified_policy(r):
+        tiers = r.get("tiers", {})
+        contents = {t: _artifact(r, t) for t in TIER_ORDER}
+        lat = {t: (tiers.get(t) or {}).get("latency_ms", 0) for t in TIER_ORDER}
+        chosen, total = cascade.cascade_verified(r.get("task", ""), contents, lat,
+                                                 r.get("fn"), r.get("tests"))
+        return chosen, total
+
     def eval_policy(chooser, accumulate_cost):
         costs, qs = [], []
         for r in test:
@@ -76,19 +101,42 @@ def main():
         "random": eval_policy(policy_random, False),
         "heuristic": eval_policy(policy_heuristic, False),
         "cascade": eval_policy(cascade_policy, True),
+        "cascade-verified": eval_policy(cascade_verified_policy, True),
         "learned": eval_policy(lambda r: preds.get(r.get("id"), "turbo"), False) if preds else (0.0, 0.0),
         "oracle": eval_policy(lambda r: r["oracle"], False),
     }
     q_floor, q_ceil = pts["random"][1], pts["oracle"][1]
+
     def capture(k):
         if q_ceil <= q_floor: return 0.0
         if k == "random": return 0.0
         if k == "oracle": return 100.0
         return 100.0 * (pts[k][1] - q_floor) / (q_ceil - q_floor)
+
     for k, (c, q) in pts.items():
-        print(f"{k:12s} cost={c:9.1f}ms quality={q:.3f} capture={capture(k):5.1f}%")
+        print(f"{k:18s} cost={c:9.1f}ms quality={q:.3f} capture={capture(k):5.1f}%")
+
     md = ("| policy | avg cost (ms) | quality | oracle-gap captured (%) |\n|---|---|---|---|\n"
           + "".join(f"| {k} | {c:.1f} | {q:.3f} | {capture(k):.1f}% |\n" for k, (c, q) in pts.items()))
+
+    # per-task, per-tier quality (the tier characterization table)
+    per = collections.defaultdict(lambda: collections.defaultdict(list))
+    for r in test:
+        for t, v in (r.get("tiers") or {}).items():
+            per[r["task"]][t].append(v.get("quality", 0.0))
+    md += "\n## Per-task quality on the test split\n\n| task | " + " | ".join(TIER_ORDER) + " |\n|---|" + "---|" * len(TIER_ORDER) + "\n"
+    for task in sorted(per):
+        md += f"| {task} | " + " | ".join(
+            f"{sum(per[task][t])/max(1,len(per[task][t])):.3f}" if per[task].get(t) else "n/a"
+            for t in TIER_ORDER) + " |\n"
+
+    # oracle label distribution
+    dist = collections.Counter(r.get("oracle") for r in test)
+    md += "\n## Oracle tier distribution (test split)\n\n| tier | count | share |\n|---|---|---|\n"
+    for t in TIER_ORDER:
+        n = dist.get(t, 0)
+        md += f"| {t} | {n} | {n/max(1,len(test)):.3f} |\n"
+
     (BASE / "analysis" / "table.md").write_text(md, encoding="utf-8")
     print("wrote analysis/table.md")
     try:
@@ -102,6 +150,7 @@ def main():
         print("wrote analysis/cost_quality.png")
     except ImportError:
         print("matplotlib missing — wrote table.md only")
+
 
 if __name__ == "__main__":
     main()
