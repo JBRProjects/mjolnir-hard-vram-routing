@@ -28,6 +28,10 @@ def main():
                     help="merge only the ids present in every tier file (default: require identical ids)")
     args = ap.parse_args()
     tier_files = {n: p for n, p in args.tier} if args.tier else {k: v for k, v in TIERS_DEFAULT.items() if pathlib.Path(v).exists()}
+    missing = [n for n, p in tier_files.items() if not pathlib.Path(p).exists()]
+    for n in missing:
+        print(f"[merge] tier file for '{n}' not found, skipping")
+        tier_files.pop(n)
     data = {n: read_jsonl(p) for n, p in tier_files.items()}
     if not data:
         print("no inputs"); return
