@@ -69,6 +69,47 @@ def score_reasoning(output, reference):
 
 
 # ------------------------------------------------------------------- metric v2
+def _first_sentences(text: str, n: int = 2):
+    """The first n sentences of the trimmed output."""
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if not t:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", t)
+    return [p.strip() for p in parts[:n] if p.strip()]
+
+
+def _numeric_contains(text: str, gold: str) -> bool:
+    """True when the gold value appears as a standalone number in the text.
+
+    Used for reasoning items, whose gold is a computed value: a model that
+    states the value anywhere in its (trimmed) reasoning has answered, even if
+    it then keeps talking. Restricting the rule to numbers avoids the false
+    positives a loose text search would produce for named answers.
+    """
+    from scoring.extract import numeric_tokens
+    gn, tn = numeric_tokens(gold), numeric_tokens(text)
+    return bool(gn) and gn[0] in set(tn)
+
+
+def _candidates(text: str, task: str):
+    """Answer candidates of a trimmed output.
+
+    The tiers differ a lot in verbosity: turbo/ultra answer and stop, while
+    vector often states the answer first and then keeps generating (it was
+    trained on Q&A text, so it invents further questions). Judging only the tail
+    of the output would measure verbosity instead of correctness - the cycle-1
+    mistake in the opposite direction - so the answer is looked for in the
+    positions where a model makes an assertion: the extracted final answer, the
+    opening sentences, and (for numeric golds) anywhere in the trimmed text.
+    """
+    cands = []
+    ans = extract_answer(text)
+    if ans:
+        cands.append(ans)
+    cands.extend(_first_sentences(text, 2))
+    return cands
+
+
 def _gold_in_text(gold: str, text: str) -> bool:
     """Lenient fallback: the gold answer appears in the trimmed output.
 
@@ -90,9 +131,9 @@ def v2_factual(output, reference):
     if not reference:
         return 0.0
     text = trim_continuation(output)
-    ans = extract_answer(text)
-    if answer_match(ans, reference):
-        return 1.0
+    for cand in _candidates(text, "factual_qa"):
+        if answer_match(cand, reference):
+            return 1.0
     if _gold_in_text(reference, text):
         return 1.0
     return 0.0
@@ -102,8 +143,10 @@ def v2_reasoning(output, reference):
     if not reference:
         return 0.0
     text = trim_continuation(output)
-    ans = extract_answer(text)
-    if answer_match(ans, reference):
+    for cand in _candidates(text, "reasoning"):
+        if answer_match(cand, reference):
+            return 1.0
+    if _numeric_contains(text, reference):
         return 1.0
     if _gold_in_text(reference, text):
         return 1.0

@@ -245,7 +245,7 @@ def _tokens(s: str):
     return [t for t in normalize_answer(s).split() if t]
 
 
-def _num_tokens(s: str):
+def numeric_tokens(s: str):
     """Numeric-looking tokens, normalized (150.0 -> 150, 3/4 -> 0.75)."""
     out = []
     for t in _tokens(s):
@@ -267,6 +267,10 @@ def _num_tokens(s: str):
         except ValueError:
             pass
     return out
+
+
+# backwards-compatible alias
+_num_tokens = numeric_tokens
 
 
 def answer_match(pred: str, gold: str) -> bool:

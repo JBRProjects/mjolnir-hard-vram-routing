@@ -117,10 +117,10 @@ RESULTS.md section 2.1 shows the size of the effect on live data.
 See RESULTS.md. Headline findings on live hardware:
 
 * the repaired metric reverses the cycle-1 ranking on reasoning (turbo 0.400,
-  ultra 0.550) and separates code generation by behaviour rather than naming
+  ultra 0.600) and separates code generation by behaviour rather than naming
   (turbo 0.800, ultra 0.700, vector 0.043 - vector answers code prompts in
   prose);
-* the learned router captures 70% of the oracle gap at lower cost than the
+* the learned router captures 75% of the oracle gap at lower cost than the
   oracle on the cycle-1 data, and the cascade gated on surface confidence
   collapses to the cheapest tier (the cycle-1 "68.8% capture" was a metric
   artefact);
