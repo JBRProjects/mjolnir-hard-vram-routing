@@ -29,7 +29,7 @@ BASE = pathlib.Path(__file__).parent.parent
 sys.path.insert(0, str(BASE))
 from router.cascade import confidence_proxy
 from scoring.extract import (answer_match, extract_answer, extract_code,
-                              normalize_answer, trim_continuation)
+                              normalize_answer, repair_code, trim_continuation)
 from scoring.exec_tests import score_code_exec
 
 
@@ -115,11 +115,16 @@ def v2_code(output, reference, fn=None, tests=None):
     task carries no unit tests (e.g. cycle-1 oracle data)."""
     if not tests:
         return score_code(output, reference), None
-    code = extract_code(output)
+    code = repair_code(extract_code(output), fn)
     if not code.strip():
         return 0.0, {"error": "no code extracted"}
-    score = score_code_exec(code, fn, tests)
-    return score, {"tests_passed": f"{score * len(tests):.0f}/{len(tests)}"}
+    from scoring.exec_tests import run_tests
+    r = run_tests(code, fn, tests)
+    score = r["passed"] / r["total"] if r.get("total") else 0.0
+    detail = {"tests_passed": f"{r['passed']}/{r['total']}"}
+    if r.get("error"):
+        detail["error"] = r["error"]
+    return score, detail
 
 
 # ------------------------------------------------------------------ judge (v2)

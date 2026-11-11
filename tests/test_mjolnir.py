@@ -14,7 +14,7 @@ BASE = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 
 from scoring.extract import (answer_match, extract_answer, extract_code,
-                              normalize_answer, trim_continuation)
+                              normalize_answer, repair_code, trim_continuation)
 from scoring.exec_tests import run_tests, score_code_exec
 from scoring.score import v2_code, v2_factual, v2_reasoning
 from router.heuristic import route
@@ -76,6 +76,19 @@ def test_exec():
     check("forbidden import is blocked", r["error"] is not None and r["passed"] == 0)
 
 
+def test_repair_code():
+    print("repair_code")
+    truncated = ("def is_prime(n):\n    if n < 2:\n        return False\n"
+                 "    return True\n"
+                 "def is_prime(n):\n    if n <= 1:\n        ret")   # cut mid-statement
+    fixed = repair_code(truncated, "is_prime")
+    check("truncated repetition is repaired", "return True" in fixed and fixed.count("def is_prime") == 1)
+    good = "def f(x):\n    return x"
+    check("valid code is unchanged", repair_code(good, "f") == good)
+    broken = "def f(x):\n    retur"
+    check("unrepairable code is returned as is", repair_code(broken, "f") == broken)
+
+
 def test_scorer_v2():
     print("scorer v2")
     check("factual match", v2_factual("The capital of France is Paris.", "Paris") == 1.0)
@@ -132,8 +145,8 @@ def test_prompt_set():
 
 
 def main():
-    for t in (test_trim, test_extract_answer, test_extract_code, test_exec,
-              test_scorer_v2, test_routers, test_prompt_set):
+    for t in (test_trim, test_extract_answer, test_extract_code, test_repair_code,
+              test_exec, test_scorer_v2, test_routers, test_prompt_set):
         t()
     if FAILS:
         print(f"\n{len(FAILS)} FAILURES: {FAILS}")

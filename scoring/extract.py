@@ -100,6 +100,51 @@ def extract_code(text: str) -> str:
     return "\n".join(out).strip()
 
 
+def repair_code(code: str, fn=None) -> str:
+    """Recover a runnable program from a candidate that does not parse.
+
+    The tiers frequently repeat the function and then run out of budget
+    mid-definition, so the raw candidate ends with a half-written statement
+    (a SyntaxError) even though the first copy of the function is complete.
+    Dropping the whole candidate would then zero out a correct answer.
+
+    Strategy: try the candidate as a whole, then progressively shorter
+    line-aligned prefixes, and keep the longest prefix that parses and defines
+    `fn` (or simply parses, when no function name is known). The returned code
+    is the source segment of that definition when possible.
+    """
+    import ast
+    code = (code or "").strip()
+    if not code:
+        return code
+    lines = code.splitlines()
+
+    def _pick(src):
+        try:
+            tree = ast.parse(src)
+        except SyntaxError:
+            return None
+        if fn:
+            for node in tree.body:
+                if isinstance(node, ast.FunctionDef) and node.name == fn:
+                    seg = ast.get_source_segment(src, node)
+                    return seg if seg else src
+            return None
+        return src
+
+    got = _pick(code)
+    if got is not None:
+        return got
+    for end in range(len(lines) - 1, 0, -1):
+        src = "\n".join(lines[:end]).rstrip()
+        if not src:
+            continue
+        got = _pick(src)
+        if got is not None:
+            return got
+    return code
+
+
 # ------------------------------------------------------------ answer extract
 
 _ANSWER_PATTERNS = [

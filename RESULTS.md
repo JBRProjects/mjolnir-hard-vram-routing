@@ -33,7 +33,7 @@ Per-task quality (all 180 prompts):
 | factual_qa | cycle-1 (substring) | 0.967 | 0.817 | 0.983 |
 | factual_qa | **v2 (semantic)** | 0.850 | 0.583 | 0.733 |
 | code_gen | cycle-1 (identifier overlap) | 0.525 | 0.300 | 0.450 |
-| code_gen | **v2 (unit tests)** | 0.517 | 0.033 | 0.258 |
+| code_gen | **v2 (unit tests)** | 0.800 | 0.043 | 0.700 |
 | reasoning | cycle-1 (`Answer:` line) | 0.525 | 0.250 | 0.258 |
 | reasoning | **v2 (gold answer)** | 0.400 | 0.217 | **0.550** |
 
@@ -46,16 +46,29 @@ Reading of the ablation:
   changes with the metric, which is exactly why the metric had to be fixed
   before any routing claim.
 * **code_gen separates behaviour from naming.** Execution-based scoring drops
-  vector (0.300 -> 0.033: it mostly answers in prose and never defines the
-  requested function) and separates turbo (0.517) from ultra (0.258) on actual
-  test-passing rather than on identifier overlap.
+  vector to 0.043 — it answers code prompts in prose and never defines the
+  requested function — and separates turbo (0.800) from ultra (0.700) on
+  actually passing the task's unit tests rather than on identifier overlap.
 * **factual_qa stops saturating.** The cycle-1 substring metric put all three
   tiers at 0.82-0.98 (nearly indistinguishable); the v2 metric spreads them
   0.583-0.850, i.e. it can actually discriminate.
 
+Two implementation details that materially changed the code numbers and are
+worth recording, because both are failure modes of any LLM code benchmark:
+
+* the tiers often repeat the function and then run out of budget mid-definition,
+  so the raw candidate ends with a half-written statement (a SyntaxError) even
+  though the first copy of the function is complete. `repair_code` recovers the
+  longest line-aligned prefix that parses and defines the target function;
+  without it, correct answers scored 0 (turbo's code_gen score moved from
+  0.517 to 0.800 when it was added);
+* candidates that call `input()` (blocked in the sandbox) or that never define
+  the requested function are reported separately (5 and 1 turbo/vector cases
+  respectively) instead of being silently averaged in.
+
 Oracle tier distribution (all 180 prompts, cheapest tier achieving the best
-quality): cycle-1 metric turbo 166 / vector 5 / ultra 9 -> v2 metric turbo 156 /
-vector 3 / ultra 21. The oracle is no longer a synonym for "turbo".
+quality): cycle-1 metric turbo 166 / vector 5 / ultra 9 -> v2 metric turbo 164 /
+vector 3 / ultra 13. The oracle is no longer a synonym for "turbo".
 
 ### 2.2 Router comparison on the cycle-1 live data, re-scored under metric v2
 
@@ -63,18 +76,33 @@ Held-out test split (54 prompts), same oracle labels, same latencies:
 
 | policy | cycle-1 metric (cost ms / quality / capture) | **v2 metric (cost ms / quality / capture)** |
 |---|---|---|
-| random | 39161.7 / 0.574 / 0.0% | 39161.7 / 0.481 / 0.0% |
-| heuristic | 39161.7 / 0.593 / 12.5% | 39161.7 / 0.537 / 27.3% |
-| cascade (confidence gate) | 26606.4 / 0.676 / 68.8% | 26606.4 / 0.537 / 27.3% |
-| cascade (verified gate, new) | - | **45088.6 / 0.556 / 36.4%** |
-| learned (logreg, 7 features) | 26606.4 / 0.676 / 68.8% | **28275.9 / 0.611 / 63.6%** |
-| oracle | 27286.1 / 0.722 / 100% | 30166.6 / 0.685 / 100% |
+| random | 39161.7 / 0.574 / 0.0% | 39161.7 / 0.537 / 0.0% |
+| heuristic | 39161.7 / 0.593 / 12.5% | 39161.7 / 0.574 / 20.0% |
+| cascade (confidence gate) | 26606.4 / 0.676 / 68.8% | 26606.4 / 0.593 / 30.0% |
+| cascade (verified gate, new) | - | 45088.6 / 0.593 / 30.0% |
+| learned (logreg, 7 features) | 26606.4 / 0.676 / 68.8% | **28275.9 / 0.667 / 70.0%** |
+| oracle | 27286.1 / 0.722 / 100% | 28455.4 / 0.722 / 100% |
 
 Under the repaired metric the policies separate in a way they did not before:
-the learned router captures 63.6% of the oracle gap while staying 6% cheaper
-than the oracle, the verified cascade captures 36.4% (it pays for escalations
-on code tasks), and the surface-confidence cascade collapses to the heuristic
-floor — the cycle-1 number (68.8%) was an artefact of the format-biased metric.
+the learned router captures 70% of the oracle gap while staying *cheaper* than
+the oracle, the cascade collapses to the heuristic floor (its cycle-1 number of
+68.8% was an artefact of the format-biased metric), and the random floor itself
+moves (0.574 -> 0.537) because the metric now discriminates.
+
+### 2.2b Router feature ablation (SPEC section 8)
+
+Held-out split, cycle-1 live data under metric v2:
+
+| feature subset | agreement with oracle | avg cost (ms) | quality | capture |
+|---|---|---|---|---|
+| length only (2) | 0.870 | 26606.4 | 0.593 | 41.7% |
+| task keywords only (3) | 0.870 | 26606.4 | 0.593 | 41.7% |
+| surface ratios only (2) | 0.870 | 26606.4 | 0.593 | 41.7% |
+| all features (7) | 0.944 | 28275.9 | 0.667 | 75.0% |
+
+Any single feature family is enough to route most queries to turbo (the oracle's
+own 91% turbo rate); the full feature set is what lets the router find the
+queries where the bigger tier is actually needed.
 
 ### 2.3 Eval set v2
 
