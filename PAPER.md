@@ -29,9 +29,13 @@ self-checked at build time.
 
 On the first live data set, re-scored under the repaired metric, the conclusion
 *changes*: the tier that looked worse than the cheapest one on reasoning turns
-out to be the better one (0.550 vs 0.400), and a cheap-feature learned router
-captures 70% of the oracle's quality gap while being cheaper than the oracle
-itself. We also report what the repair costs: a cascade gated on a surface
+out to be the better one (0.600 vs 0.400). On a fresh, 180-item live cycle the
+oracle gap is large (0.718 for random routing vs 0.927 for the oracle on the
+held-out split), and the best implementable policies are a cascade gated on a
+task-specific verifier (82.4% of the gap) and a cost-aware learned router
+(~96% of the oracle quality at ~1.2x the oracle cost) - while a cheap-feature
+classifier captures only 35.3% and a hand-written heuristic is *worse than
+random*. We also report what the repair costs: a cascade gated on a surface
 confidence signal collapses to "always cheapest", which is the honest reading of
 the cycle-1 result.
 
@@ -114,17 +118,28 @@ RESULTS.md section 2.1 shows the size of the effect on live data.
 
 ## 5. Results
 
-See RESULTS.md. Headline findings on live hardware:
+See RESULTS.md for the full tables. Headline findings on live hardware:
 
-* the repaired metric reverses the cycle-1 ranking on reasoning (turbo 0.400,
-  ultra 0.600) and separates code generation by behaviour rather than naming
-  (turbo 0.800, ultra 0.700, vector 0.043 - vector answers code prompts in
-  prose);
-* the learned router captures 75% of the oracle gap at lower cost than the
-  oracle on the cycle-1 data, and the cascade gated on surface confidence
-  collapses to the cheapest tier (the cycle-1 "68.8% capture" was a metric
-  artefact);
-* live cycle-2 numbers on 180 distinct items: `[pending]`.
+* **the repaired metric reverses the cycle-1 ranking.** On the cycle-1 prompts
+  re-scored under v2, reasoning goes from turbo 0.525 / ultra 0.258 (a
+  formatting artefact) to turbo 0.400 / ultra 0.600. On the fresh cycle-2
+  prompt set (60 distinct tasks per slice) ultra passes 96.8% of the code
+  unit tests against turbo's 65.9%, and wins reasoning 0.817 vs 0.783.
+* **the oracle gap is large.** On the held-out split: random routing 0.718,
+  oracle 0.927. The cycle-1 metric made the same comparison look like
+  0.574 -> 0.722 with almost no achievable headroom.
+* **the best implementable policies are the verifier-gated cascade and the
+  cost-aware learned router**, not the cheap-feature classifier: the verified
+  cascade captures 82.4% of the oracle gap (0.890 at 35.0 s), the cost-aware
+  router reaches the same quality for 30.7 s (lambda = 0.10, ~96% of the
+  oracle quality at ~1.2x the oracle cost), while the 7-feature learned router
+  captures only 35.3% because it mostly learns the 81%-turbo prior.
+* **a heuristic router can be worse than random** (-130% of the gap): routing
+  mid-length prompts to vector, the weakest tier on code (0.143), loses to
+  uniform routing. Under a fixed memory budget a router needs the *measured*
+  tier profile, not just prompt features.
+* live cycle-2 numbers on 180 distinct items: 540/540 tier-runs successful,
+  zero errors (2026-11-11).
 
 ## 6. Discussion
 
@@ -133,11 +148,24 @@ style, any metric that touches style will decide the experiment. Our first
 cycle produced a clean, publishable-looking table whose main conclusion
 ("route everything to the cheapest tier") was a property of the metric.
 
-*Where routing still fails.* [pending cycle-2 analysis]
+*Where routing still fails.* The cheap-feature router is the weak link: with
+126 training rows and an oracle label distribution dominated by one tier, the
+classifier has little to learn from. The two policies that do well - the
+verifier-gated cascade and the cost-aware pair model - both exploit structure
+the cheap-feature classifier does not have: a task-specific verifier (unit
+tests) and an explicit per-tier correctness probability with a cost term.
 
 *Memory-eviction robustness.* Only one tier is resident at a time, so tier
 switching is a real cost that the latency measurement includes; a future cycle
-should add the swap cost explicitly.
+should add the swap cost explicitly. The v2 run also shows the cost profile
+itself is prompt-dependent (vector went from 36.0 s to 49.6 s on the harder
+v2 prompt set), which matters for any budget-aware router.
+
+*Next cycle.* (i) a judge-based secondary metric over the full v2 set (the
+code path is in place and was used for a validation subset), (ii) an
+on-policy evaluation of the cascade (the current numbers are off-policy, i.e.
+the measured latency and quality of the tier the policy would have picked),
+(iii) more than three tiers and a real eviction schedule.
 
 ## 7. Related work
 

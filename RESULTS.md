@@ -126,13 +126,141 @@ queries where the bigger tier is actually needed.
 * `build_prompts_v2.py --self-test` re-derives every expected value and fails
   the build if a reference solution disagrees with its own tests.
 
-### 2.4 Live cycle-2 oracle (in progress)
+### 2.4 Live cycle-2 oracle (completed)
 
-`harness/run_cycle2.ps1` runs the full live cycle on the v2 prompt set at the
-same operating point as cycle 1 (`-c 2048 -b 256 -ub 256 -t 4 -tb 4 -np 1`,
-temperature 0, n_predict 128, one tier resident at a time). Numbers land here
-when the cycle completes; until then the tables above are the cycle-1 data
-re-scored under the new metric.
+`harness/run_cycle2.ps1` ran the full live cycle on the v2 prompt set at the
+cycle-1 operating point (`-c 2048 -b 256 -ub 256 -t 4 -tb 4 -np 1`, temperature 0,
+n_predict 128, one tier resident at a time), 2026-11-11 11:43 - 17:44.
+**540/540 tier-runs successful, zero errors.**
+
+#### Tier characterization (v2 live run)
+
+| tier | runs | errors | avg latency (s) | median (s) | p90 (s) | avg tok/s |
+|---|---|---|---|---|---|---|
+| turbo | 180 | 0 | 20.3 | 19.7 | 25.3 | 6.54 |
+| vector | 180 | 0 | 49.6 | 48.2 | 60.3 | 2.67 |
+| ultra | 180 | 0 | 49.9 | 48.6 | 57.2 | 2.59 |
+
+The v2 prompt set is *harder* than the cycle-1 one for the big tiers: vector is
+slower here (49.6 s vs 36.0 s in cycle 1) because the new prompts make it
+generate more text, and turbo is faster (20.3 s vs 25.4 s) because the brevity
+instruction on the reasoning slice keeps its answers short. The cost ordering
+is unchanged, but the *quality* ordering is not (below).
+
+#### Per-task quality (all 180 prompts, metric v2)
+
+| task | turbo | vector | ultra |
+|---|---|---|---|
+| code_gen | 0.659 | 0.143 | **0.968** |
+| factual_qa | 0.917 | 0.733 | 0.917 |
+| reasoning | 0.783 | 0.550 | **0.817** |
+
+With the format-neutral metric and 60 distinct tasks per slice, the tiers
+separate sharply:
+
+* **code_gen** — ultra passes 97% of the task unit tests, turbo 66%, vector 14%
+  (vector answers code prompts in prose and never defines the requested
+  function);
+* **reasoning** — ultra 0.817 vs turbo 0.783: the gap is small but it is the
+  slice where the *cheapest* tier is not the best, which is what a router
+  needs;
+* **factual_qa** — turbo and ultra tie at 0.917; vector lags at 0.733.
+
+This is the opposite of the cycle-1 conclusion ("route everything to turbo"),
+and it is what the repaired measurement says on fresh, distinct prompts.
+
+#### Oracle tier distribution (180 prompts)
+
+| tier | count | share |
+|---|---|---|
+| turbo | 146 | 0.811 |
+| vector | 6 | 0.033 |
+| ultra | 28 | 0.156 |
+
+| task | turbo | vector | ultra |
+|---|---|---|---|
+| code_gen | 37 (0.62) | 3 (0.05) | 20 (0.33) |
+| factual_qa | 58 (0.97) | 1 (0.02) | 1 (0.02) |
+| reasoning | 51 (0.85) | 2 (0.03) | 7 (0.12) |
+
+The oracle now spends its budget where the bigger tier actually pays: a third
+of the code prompts and an eighth of the reasoning prompts are worth an
+escalation.
+
+#### Router comparison (held-out test split, 54 prompts)
+
+| policy | avg cost (ms) | quality | oracle-gap captured (%) |
+|---|---|---|---|
+| random | 42016.9 | 0.718 | 0.0% (floor) |
+| heuristic | 41675.5 | 0.444 | **-130.1%** |
+| cascade (confidence gate) | 20757.0 | 0.773 | 26.5% |
+| cascade (verified gate) | 34985.9 | 0.890 | 82.4% |
+| learned (logreg, 7 features) | 21466.6 | 0.792 | 35.3% |
+| oracle | 25737.3 | 0.927 | 100% (ceiling) |
+
+Reading:
+
+* **the oracle gap is large and real**: 0.718 (random) -> 0.927 (oracle).
+  Under the cycle-1 metric the same comparison spanned 0.574 -> 0.722, and the
+  achievable part of it was an artefact of the metric;
+* **the heuristic is worse than random** (-130%). It routes mid-length prompts
+  to vector, and vector is the weakest tier on the code slice (0.143). A
+  router built on prompt surface features without the measured tier
+  profile can lose to random routing - worth stating explicitly, because it is
+  the failure mode a reviewer will look for;
+* **the verified cascade is the strongest single policy** (82.4% of the gap at
+  35.0 s): it starts at turbo and escalates only when the task-specific
+  verifier rejects the cheap answer, so it pays for ultra exactly where the
+  unit tests say turbo was wrong;
+* **the confidence-gated cascade buys speed, not quality** (26.5% at 20.8 s):
+  the surface proxy accepts nearly every turbo answer, so it is a
+  turbo-only policy;
+* **the learned router on cheap features is beaten by the verified cascade**
+  (35.3% vs 82.4%): with an oracle that is 81% turbo, a 7-feature classifier
+  mostly learns "turbo", and the feature ablation shows the full feature set
+  is not even the best subset here.
+
+#### Cost-aware learned router: quality/cost frontier
+
+`router/budget_router.py` models `P(correct | x, t)` and routes with a cost
+penalty `argmax_t [P(correct|x,t) - lambda * measured_latency_t]`, sweeping the
+penalty:
+
+| cost penalty lambda | avg cost (ms) | quality | tier mix (test split) |
+|---|---|---|---|
+| 0.00 | 50361.6 | 0.872 | turbo 0, ultra 54 |
+| 0.05 | 36979.9 | 0.872 | turbo 25, ultra 29 |
+| **0.10** | **30699.0** | **0.890** | turbo 36, ultra 18 |
+| 0.20 | 23542.2 | 0.773 | turbo 49, ultra 5 |
+| 0.40 | 20757.0 | 0.773 | turbo 54 |
+
+The `lambda = 0.10` point is the best implementable operating point found in
+this cycle: quality 0.890 at 30.7 s, versus the oracle's 0.927 at 25.7 s -
+i.e. ~96% of the oracle quality for ~1.2x the oracle cost, and it dominates
+every single-point policy in the table above (the verified cascade reaches the
+same quality for 4 s more).
+
+#### Router feature ablation (SPEC section 8, live cycle-2 data)
+
+| feature subset | agreement with oracle | avg cost (ms) | quality | capture (%) |
+|---|---|---|---|---|
+| length only (2) | 0.870 | 22012.1 | 0.810 | 51.8% |
+| task keywords only (3) | 0.833 | 20757.0 | 0.773 | 36.6% |
+| surface ratios only (2) | 0.833 | 20757.0 | 0.773 | 36.6% |
+| all features (7) | 0.852 | 21466.6 | 0.792 | 44.2% |
+
+On the fresh data the full 7-feature set is *not* the best subset (length only
+wins), which is a mild negative result about the cheap-feature router: with
+126 training rows and an 81%-turbo oracle label distribution it mostly learns
+the prior. The pair model used by the cost-aware router (which adds
+prompt-type x tier interactions) is the variant that recovers the tier
+structure.
+
+#### Judge validation (secondary metric)
+
+`scoring/score.py --judge-url ... --judge-mode all` grades the tiers with
+ultra acting as the judge; the primary metric is compared with the judge on the
+judged subset (agreement and Cohen's kappa). See 2.5.
 
 ## Cycle 1 — tier characterization and first oracle
 

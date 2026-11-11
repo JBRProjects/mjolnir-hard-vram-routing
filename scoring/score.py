@@ -32,6 +32,8 @@ from scoring.extract import (answer_match, extract_answer, extract_code,
                               normalize_answer, repair_code, trim_continuation)
 from scoring.exec_tests import score_code_exec
 
+TIER_ORDER = ["turbo", "vector", "ultra"]   # cost order: cheapest first
+
 
 # --------------------------------------------------------------- legacy (v1)
 def norm(s): return re.sub(r"\s+", " ", (s or "").strip().lower())
@@ -213,7 +215,7 @@ def judge_once(url, prompt_text, timeout=120):
         return None
 
 
-def run_judge(rows, url, max_calls, tasks=None, mode="disagree"):
+def run_judge(rows, url, max_calls, tasks=None, mode="disagree", max_chars=1500):
     """Judge score in {0.0,1.0} for tiers.
 
     mode="disagree" (default): judge the tiers that scored 0 on prompts where the
@@ -242,7 +244,7 @@ def run_judge(rows, url, max_calls, tasks=None, mode="disagree"):
             content = tiers[t].get("content", "")
             if not content.strip(): continue
             reply = judge_once(url, JUDGE_TMPL.format(q=r.get("prompt", ""), ref=r.get("reference", ""),
-                                                      cand=trim_continuation(content)[:1500]))
+                                                      cand=trim_continuation(content)[:max_chars]))
             if reply is None:
                 continue
             out[r["id"]][t] = 1.0 if reply == "yes" else 0.0
@@ -313,6 +315,8 @@ def main():
     ap.add_argument("--judge-mode", choices=["disagree", "all"], default="disagree",
                     help="disagree = judge only the tiers the primary metric marked wrong; "
                          "all = judge every tier (metric validation against a judge)")
+    ap.add_argument("--judge-max-chars", type=int, default=1500,
+                    help="max characters of the candidate answer sent to the judge (shorter = faster)")
     args = ap.parse_args()
     rows = [json.loads(l) for l in pathlib.Path(args.inp).read_text(encoding="utf-8").splitlines() if l.strip()]
     if args.gold:
@@ -320,7 +324,8 @@ def main():
         print(f"[gold] attached gold to {n}/{len(rows)} rows from {args.gold}")
     judged = {}
     if args.judge_url:
-        judged, n_calls = run_judge(rows, args.judge_url, args.judge_max, args.judge_tasks, args.judge_mode)
+        judged, n_calls = run_judge(rows, args.judge_url, args.judge_max, args.judge_tasks,
+                                    args.judge_mode, args.judge_max_chars)
         print(f"[judge] {n_calls} calls completed ({len(judged)} prompts judged, mode={args.judge_mode})")
     out = []
     for r in rows:

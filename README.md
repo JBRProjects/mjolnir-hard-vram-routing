@@ -120,12 +120,17 @@ See `SPEC.md` for formalization (tiers, budget B, router, oracle upper bound) an
 
 ## Status
 
-Cycle 2 in progress: the quality metric was rebuilt (format-neutral extraction
-+ execution-based code scoring) and the eval set was replaced with 180 distinct
-items - cycle 1 had only 20 distinct items repeated with cosmetic `(variant N)`
-suffixes, which also leaked across the train/test split. The cycle-1 live oracle
-data was re-scored under the new metric (the oracle gap is no longer
-degenerate), and a fresh live oracle cycle on the v2 prompt set is running.
+Cycle 2 complete: the quality metric was rebuilt (format-neutral extraction +
+execution-based code scoring), the eval set was replaced with 180 distinct items
+(cycle 1 had only 20 distinct items repeated with cosmetic variants, which also
+leaked across the train/test split), and a fresh live oracle cycle was collected
+on the new prompt set (540/540 tier-runs, zero errors, 2026-11-11).
+
+Headline numbers on the held-out split: random routing 0.718, oracle 0.927;
+the verifier-gated cascade captures 82.4% of the oracle gap, the cost-aware
+learned router reaches 0.890 at 30.7 s (vs the oracle's 0.927 at 25.7 s), the
+cheap-feature learned router 35.3%, and the hand-written heuristic is *worse
+than random*. Full tables in RESULTS.md.
 
 ## Note
 
