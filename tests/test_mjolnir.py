@@ -59,6 +59,12 @@ def test_extract_code():
     check("fenced block", extract_code(code).startswith("def f(x):"))
     check("bare code", extract_code("sure:\ndef f(x):\n    return x").startswith("def f(x):"))
     check("prose -> empty", extract_code("Write a function that adds numbers.") == "")
+    prefixed = (" No need to import any module. No need to use any loop. "
+                "def is_prime(n):\n    return n in (2, 3, 5, 7)")
+    got = extract_code(prefixed, "is_prime")
+    check("prose-prefixed code is found by function name", got.startswith("def is_prime(n):"))
+    check("prose-prefixed code still executes", score_code_exec(repair_code(got, "is_prime"), "is_prime",
+                                                                [{"args": [7], "expected": True}]) == 1.0)
 
 
 def test_exec():
