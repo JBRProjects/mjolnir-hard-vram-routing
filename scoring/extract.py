@@ -246,10 +246,18 @@ def _tokens(s: str):
 
 
 def _num_tokens(s: str):
-    """Numeric-looking tokens, normalized (150.0 -> 150)."""
+    """Numeric-looking tokens, normalized (150.0 -> 150, 3/4 -> 0.75)."""
     out = []
     for t in _tokens(s):
         t = t.replace(",", "")
+        if "/" in t:
+            try:
+                a, b = t.split("/", 1)
+                f = float(a) / float(b)
+            except (ValueError, ZeroDivisionError):
+                continue
+            out.append(("%.6f" % f).rstrip("0").rstrip("."))
+            continue
         try:
             f = float(t)
             if f == int(f):
@@ -280,6 +288,13 @@ def answer_match(pred: str, gold: str) -> bool:
     pn, gn = _num_tokens(p), _num_tokens(g)
     if gn and pn and pn[0] == gn[0]:
         return True
+    if gn and pn:
+        # "3/4" vs "0.75" and friends
+        try:
+            if abs(float(pn[0]) - float(gn[0])) < 1e-6:
+                return True
+        except ValueError:
+            pass
     gt = _tokens(gold)
     pt = _tokens(pred)
     if gt and pt:

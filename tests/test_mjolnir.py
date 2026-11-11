@@ -48,6 +48,8 @@ def test_extract_answer():
     check("the answer is", answer_match(extract_answer("The answer is 391."), "391"))
     check("last line fallback", answer_match(extract_answer("blah\nParis"), "Paris"))
     check("currency ignored", answer_match(extract_answer("Answer: $0.05"), "0.05"))
+    check("fraction equals decimal", answer_match(extract_answer("Answer: 0.75"), "3/4"))
+    check("fraction matches fraction", answer_match(extract_answer("Answer: 2/5"), "2/5"))
     check("thousands separator", answer_match(extract_answer("Answer: 2,598,960"), "2598960"))
     check("wrong answer rejected", not answer_match(extract_answer("Answer: 12"), "150"))
     check("normalize strips articles", normalize_answer("The Paris.") == "paris")
