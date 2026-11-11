@@ -1,6 +1,105 @@
 # RESULTS — Adaptive Model Routing (fill in as you go)
 
-## Tier characterization (measured, not simulated)
+## Cycle 2 — metric repair and a leakage-free eval set
+
+**Why cycle 2 exists.** Cycle 1 produced a clean oracle (540/540 tier-runs) but
+two results that could not be trusted:
+
+1. the quality metric was partly measuring *format* (see the cycle-1 caveat
+   below): turbo won reasoning because it emits a literal `Answer:` line while
+   ultra emits `**Answer:**`, and code was scored by identifier overlap with the
+   reference solution;
+2. an audit of `eval_prompts/prompts.jsonl` showed it held only **20 distinct
+   items** (10 factual, 5 code, 5 reasoning) repeated 6x/12x/12x with cosmetic
+   `(variant N)` suffixes — so the 70/30 split put variants of the same item on
+   both sides and the effective sample size was 20, not 180.
+
+Cycle 2 therefore rebuilds the *measurement*, not the router: a format-neutral
+metric (extraction + semantic matching + execution-based code scoring), and 180
+genuinely distinct eval items with gold answers for reasoning and unit tests
+for code. See SPEC.md §5.1/§5.2.
+
+### 2.1 Metric ablation on the cycle-1 LIVE data
+
+The cycle-1 oracle data (180 prompts x 3 tiers, real hardware, 2026-10-18/19)
+was re-scored under metric v2, using gold answers and unit tests reconstructed
+for the 20 cycle-1 base items (`eval_prompts/build_legacy_gold.py`). Same
+completions, same latencies, only the metric changed.
+
+Per-task quality (all 180 prompts):
+
+| task | metric | turbo | vector | ultra |
+|---|---|---|---|---|
+| factual_qa | cycle-1 (substring) | 0.967 | 0.817 | 0.983 |
+| factual_qa | **v2 (semantic)** | 0.850 | 0.583 | 0.733 |
+| code_gen | cycle-1 (identifier overlap) | 0.525 | 0.300 | 0.450 |
+| code_gen | **v2 (unit tests)** | 0.517 | 0.033 | 0.258 |
+| reasoning | cycle-1 (`Answer:` line) | 0.525 | 0.250 | 0.258 |
+| reasoning | **v2 (gold answer)** | 0.400 | 0.217 | **0.550** |
+
+Reading of the ablation:
+
+* **reasoning flips.** Under the format-sensitive metric turbo led ultra by
+  0.267 (0.525 vs 0.258) — a pure formatting artefact (plain `Answer:` vs
+  markdown `**Answer:**`). With gold answers and format-neutral extraction
+  ultra leads instead (0.550 vs 0.400). The direction of the conclusion
+  changes with the metric, which is exactly why the metric had to be fixed
+  before any routing claim.
+* **code_gen separates behaviour from naming.** Execution-based scoring drops
+  vector (0.300 -> 0.033: it mostly answers in prose and never defines the
+  requested function) and separates turbo (0.517) from ultra (0.258) on actual
+  test-passing rather than on identifier overlap.
+* **factual_qa stops saturating.** The cycle-1 substring metric put all three
+  tiers at 0.82-0.98 (nearly indistinguishable); the v2 metric spreads them
+  0.583-0.850, i.e. it can actually discriminate.
+
+Oracle tier distribution (all 180 prompts, cheapest tier achieving the best
+quality): cycle-1 metric turbo 166 / vector 5 / ultra 9 -> v2 metric turbo 156 /
+vector 3 / ultra 21. The oracle is no longer a synonym for "turbo".
+
+### 2.2 Router comparison on the cycle-1 live data, re-scored under metric v2
+
+Held-out test split (54 prompts), same oracle labels, same latencies:
+
+| policy | cycle-1 metric (cost ms / quality / capture) | **v2 metric (cost ms / quality / capture)** |
+|---|---|---|
+| random | 39161.7 / 0.574 / 0.0% | 39161.7 / 0.481 / 0.0% |
+| heuristic | 39161.7 / 0.593 / 12.5% | 39161.7 / 0.537 / 27.3% |
+| cascade (confidence gate) | 26606.4 / 0.676 / 68.8% | 26606.4 / 0.537 / 27.3% |
+| cascade (verified gate, new) | - | **45088.6 / 0.556 / 36.4%** |
+| learned (logreg, 7 features) | 26606.4 / 0.676 / 68.8% | **28275.9 / 0.611 / 63.6%** |
+| oracle | 27286.1 / 0.722 / 100% | 30166.6 / 0.685 / 100% |
+
+Under the repaired metric the policies separate in a way they did not before:
+the learned router captures 63.6% of the oracle gap while staying 6% cheaper
+than the oracle, the verified cascade captures 36.4% (it pays for escalations
+on code tasks), and the surface-confidence cascade collapses to the heuristic
+floor — the cycle-1 number (68.8%) was an artefact of the format-biased metric.
+
+### 2.3 Eval set v2
+
+`eval_prompts/build_prompts_v2.py` -> `eval_prompts/prompts_v2.jsonl`:
+
+* 180 **distinct** items, 60 factual QA / 60 code-gen / 60 reasoning, 70/30
+  stratified split (126 train / 54 test), no item in both splits;
+* every reasoning item carries a gold final answer;
+* every code item carries a function name and 2-4 unit tests whose expected
+  values are *derived by executing the reference solution* at build time, so
+  gold cannot drift from the specification;
+* `build_prompts_v2.py --self-test` re-derives every expected value and fails
+  the build if a reference solution disagrees with its own tests.
+
+### 2.4 Live cycle-2 oracle (in progress)
+
+`harness/run_cycle2.ps1` runs the full live cycle on the v2 prompt set at the
+same operating point as cycle 1 (`-c 2048 -b 256 -ub 256 -t 4 -tb 4 -np 1`,
+temperature 0, n_predict 128, one tier resident at a time). Numbers land here
+when the cycle completes; until then the tables above are the cycle-1 data
+re-scored under the new metric.
+
+## Cycle 1 — tier characterization and first oracle
+
+### Tier characterization (measured, not simulated)
 
 Operating point for the oracle cycle (uniform across tiers): `-c 2048 -b 256 -ub 256 -t 4 -tb 4 -np 1`,
 temperature 0, n_predict 128, single NVIDIA T500 4 GB (4 GB VRAM class), one tier resident at a time.
@@ -23,13 +122,13 @@ Ports (default harness): turbo 8080 / vector 8081 / ultra 8082.
 Endpoints: `GET /health`, `POST /completion`, `POST /v1/chat/completions`.
 Bring-up is scripted: `harness/bringup.ps1 -Tier <tier> [-EvalCtx 2048]` / `-Kill`.
 
-## Oracle
+### Oracle
 - Eval set: `eval_prompts/prompts.jsonl` — 180 prompts (60 factual QA / 60 code-gen / 60 reasoning), 70/30 train/test split.
 - Procedure: run all 3 tiers per prompt (solo-tier passes, one server at a time), record (latency, output) → oracle = best quality-per-cost in hindsight.
 - Oracle results: collected 2026-10-18/19. 540/540 tier-runs successful (zero errors).
   - Oracle tier distribution (all 180): turbo 158, vector 5, ultra 17. On the held-out test split (54): turbo 50, vector 3, ultra 1.
 
-## Router comparison (held-out 30%)
+### Router comparison (held-out 30%), cycle-1 metric
 | policy | avg cost (ms) | quality (correctness %) | oracle-gap captured (%) |
 |--------|---------------|-------------------------|-------------------------|
 | random | 39161.7 | 0.574 | 0.0 (floor) |
@@ -65,13 +164,12 @@ The frozen correctness metric systematically favors turbo's answer formatting:
 
 Consequence: the oracle collapses to "always turbo" and the achievable oracle gap is small
 (0.676 → 0.722 quality). This is precisely the risk flagged in SPEC §5/§12 ("quality metric is shaky").
-Next cycle should add the format-neutral judge-based secondary scoring (implemented, runnable via
-`scoring/score.py --judge-url http://127.0.0.1:8082`) and/or an answer-extraction scoring pass before
-any strong routing claims are made.
+Cycle 2 replaces the metric and re-measures (see section 2.1 above).
 
-Pipeline notes:
+### Pipeline notes
 - `scoring/scores.jsonl` carries `prompt` and per-tier `confidence` (cascade proxy) through, so
   routers/analysis evaluate on real prompt text and raw model outputs are not needed downstream.
+  Under metric v2 it additionally carries the extracted answer/code and the task's unit tests.
 - Cascade cost is the ACCUMULATED latency of every tier attempted (a failed turbo attempt still
   costs before the vector escalation).
 - `router/learned.py` trains the router and writes `router/learned_preds.jsonl`, which
@@ -86,12 +184,23 @@ Core plot: cost vs quality — see `analysis/cost_quality.png` (generated by `an
 ## Failure log
 - Ultra prefill crash on long multi-chunk prompts: isolate/skip, do not take down harness (SPEC §12).
 - Vector sequential-only under ~4GB VRAM (60s health timeout, not parallel).
+- The tiers are completion-style models served through `/completion`: after answering they keep
+  generating the next turn ("Human: ..."), so every raw output contains model noise that must be
+  trimmed before scoring (SPEC §5.1).
 
 ## Repro
 ```
+# cycle 2 (current)
+python eval_prompts/build_prompts_v2.py
+powershell -File harness/run_cycle2.ps1
+python scoring/score.py --in harness/oracle_v2.jsonl --out scoring/scores.jsonl --metric v2
+python router/learned.py
+python analysis/make_plot.py
+
+# cycle 1
 python eval_prompts/build_prompts.py
 python harness/run_oracle.py --prompts eval_prompts/prompts.jsonl --out harness/oracle.jsonl
-python scoring/score.py --in harness/oracle.jsonl --out scoring/scores.jsonl
+python scoring/score.py --in harness/oracle.jsonl --out scoring/scores.jsonl --metric legacy
 python router/learned.py  # trains on 70%, evaluates on 30%, writes router/learned_preds.jsonl
 python analysis/make_plot.py
 ```

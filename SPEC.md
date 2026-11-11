@@ -33,6 +33,54 @@ This is the single biggest risk to the project, so resolve it before writing any
 - Alternative: task-specific correctness where possible (code-execution pass/fail, factual QA with known answers) — stronger evidence, narrower scope.
 - Recommendation: pick one small, task-specific correctness benchmark (e.g., a code-gen or factual-QA slice) as your primary metric, and use judge-based scoring only as a secondary/robustness check. Reviewers trust the former far more than the latter.
 
+### 5.1 Metric v2: content, not surface form (cycle 2)
+
+Cycle 1 implemented the recommendation only partially and paid for it. The frozen
+metric was *format-sensitive*, and the format sensitivity was not random: it was
+systematically aligned with one tier's style.
+
+Measured on the cycle-1 live data (RESULTS.md):
+
+| task | what the cycle-1 metric actually measured | consequence |
+|---|---|---|
+| reasoning | presence of a literal `Answer:` line | turbo (plain) 0.525 vs ultra (markdown `**Answer:**`) 0.258 - a formatting artefact, not a capability difference |
+| code_gen | identifier overlap with the reference solution | a correct implementation with different names scored 0.5 instead of 1.0 |
+| factual_qa | reference string appearing anywhere in the output | saturated (all tiers ~0.95-0.98), so the metric could not separate tiers |
+
+Metric v2 is defined as a *pipeline* from raw completion to a scalar quality:
+
+1. **Trim** `trim_continuation`: cut the model's own continuation of the
+   conversation (`Human: ...`, `<|im_end|>`, `### Instruction`). The tiers are
+   completion-style models served through `/completion`; after answering they
+   keep generating the next turn, which used to poison every line-based rule.
+2. **Extract** `extract_answer` / `extract_code`: recover the final answer from
+   any surface form (`Answer:`, `**Answer:**`, `####`, `\boxed{}`, "the answer
+   is", last line) and the program from fenced or bare code.
+3. **Verify**:
+   * `code_gen`: *execute* the candidate and run the task's unit tests
+     (sandboxed subprocess, restricted imports, wall-clock timeout). Quality =
+     fraction of tests passed. This is behaviour, not naming, and it is the
+     strongest correctness signal available in this setting.
+   * `factual_qa` / `reasoning`: normalize the extracted answer (case,
+     punctuation, articles, units, thousands separators) and compare it to the
+     gold answer semantically (exact, numeric equality, or short containment).
+4. **Fall back** to judge scoring (ultra as judge) on the prompts where tiers
+   disagree, as a secondary/robustness metric.
+
+Consequences for the formalization: the quality function `q_i(x)` becomes
+*verifiable* rather than stylistic, the oracle label stops collapsing onto the
+cheapest tier, and the "quality floor" in Section 4 finally means something a
+reviewer can check.
+
+### 5.2 The eval set must not leak
+
+Auditing the cycle-1 prompt set showed it contained only **20 distinct items**
+(10 factual, 5 code, 5 reasoning) repeated 6x/12x/12x with cosmetic
+`(variant N)` suffixes, and the 70/30 split put variants of the same item on
+both sides. Effective sample size was 20, and the held-out score was partly
+memorisation. Cycle 2 uses 180 **distinct** items, each in exactly one split,
+with gold answers for every reasoning item and unit tests for every code item.
+
 ## 6. Routing policy — three variants to compare (ascending complexity)
 
 1. **Heuristic baseline:** route by prompt length / keyword features (e.g., "looks like code" -> turbo, "looks like reasoning" -> ultra). Cheap, no training, sets the floor.
@@ -40,6 +88,21 @@ This is the single biggest risk to the project, so resolve it before writing any
 3. **Learned router:** a small classifier (logistic regression or tiny MLP over cheap prompt features — length, embedding from a small local encoder, maybe a few structural features) trained on the oracle labels from your eval set. This is the actual contribution; keep it deliberately small so it stays "cheap enough to not defeat the purpose."
 
 The paper's core plot: cost vs. quality, four points/curves (heuristic, cascade, learned, oracle), ideally with a random-routing baseline too as a sanity floor.
+
+### 6.1 Cascade with a task-specific verifier (cycle 2 addition)
+
+The cycle-1 cascade used a surface confidence proxy (output length, repetition,
+emptiness) because `/completion` exposes no logits. Measured on live data, that
+gate accepts essentially every turbo answer, so the cascade degenerated to
+"always turbo" and was indistinguishable from the heuristic baseline.
+
+Metric v2 makes a *verifier* available: for code tasks the task's own unit
+tests can be executed against the candidate (tens of milliseconds, versus tens
+of seconds of generation), and for QA/reasoning the verifier is the presence of
+a well-formed final answer. The verified cascade walks turbo -> vector -> ultra,
+pays for every tier it attempts, and stops at the first tier the verifier
+accepts. This is the cheapest defensible cascade given the exposed interface,
+and it gives the paper a baseline that is not a strawman.
 
 ## 7. Using your existing infra as the testbed
 
@@ -50,10 +113,11 @@ The paper's core plot: cost vs. quality, four points/curves (heuristic, cascade,
 
 ## 8. Minimal experimental design
 
-- **Eval set:** 150-300 prompts, stratified across 2-3 task types (e.g., short factual QA, code generation, open-ended reasoning) — big enough to plot a curve, small enough to hand-label or judge-score in a weekend.
+- **Eval set:** 150-300 prompts, stratified across 2-3 task types (e.g., short factual QA, code generation, open-ended reasoning) — big enough to plot a curve, small enough to hand-label or judge-score in a weekend. (Cycle 2 uses 180 *distinct* items; see Section 5.2 for why "distinct" is the operative word.)
 - **Procedure per prompt:** run all three tiers, record latency + quality; this gives you the oracle and the full cost-quality scatter for free.
-- **Train/test split:** train router features on ~70%, report the cost-quality curve on the held-out 30%.
+- **Train/test split:** train router features on ~70%, report the cost-quality curve on the held-out 30%. No item may appear in both splits, not even in a reworded variant.
 - **Report:** the four-curve plot (Section 6), a table of tier characterization stats (your existing profiling data), and a short ablation on router feature choice.
+- **Metric ablation (added in cycle 2):** every headline number is reported under both the cycle-1 metric and metric v2, because the metric turned out to be the dominant confound.
 
 ## 9. Repo structure suggestion
 
@@ -86,6 +150,7 @@ RESULTS.md               # fill in as you go
 
 ## 12. Biggest risks
 
-- **Quality metric is shaky** -> mitigated by Section 5's recommendation to anchor on a correctness-based slice, not just judge scores.
+- **Quality metric is shaky** -> mitigated by Section 5's recommendation to anchor on a correctness-based slice, not just judge scores. *Cycle 2 outcome:* the metric was indeed the dominant confound; Section 5.1 fixes it with execution-based code scoring and semantic answer matching, and Section 5.2 fixes the eval-set leak.
 - **Only 3 tiers is a small routing space** -> be upfront about this; frame it as "instantiated at k=3, extendable" rather than pretending it's a large action space.
 - **Ultra's untested prefill path could crash mid-eval** -> run ultra's oracle pass first and isolate/skip failures rather than letting it take down the harness.
+- **Verbose tiers get truncated at the generation budget** -> cycle 1 measured 128-token answers; the larger tiers spent the budget on the reasoning trace and never emitted a final answer, so verbosity was scored as wrongness. Cycle 2 gives the reasoning prompts an explicit brevity instruction (identical for all tiers) and extracts the final answer from the trace.
