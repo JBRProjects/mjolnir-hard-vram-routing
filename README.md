@@ -32,11 +32,15 @@ harness/       # run_oracle.py  - all tiers x all prompts, latency + output
 scoring/       # score.py      - correctness primary (metric v2), judge secondary
                # extract.py    - format-neutral answer/code extraction + semantic matching
                # exec_tests.py - sandboxed execution of candidate code against unit tests
-router/        # heuristic.py, cascade.py (confidence gate + verified gate), learned.py
+router/        # heuristic.py, cascade.py (confidence gate + verified gate), learned.py,
+               # budget_router.py (cost-aware router, quality/cost frontier)
 analysis/      # make_plot.py  - cost vs quality
+               # report.py     - regenerates every RESULTS table from live data
+               # tier_table.py - per-tier latency/throughput table
 tests/         # test_mjolnir.py - unit checks (also run in CI)
 SPEC.md        # full spec
 RESULTS.md     # numbers as they land
+PAPER.md       # working-paper draft (the narrative)
 ```
 
 ## Quality metric (v2)
