@@ -28,8 +28,10 @@ scoring/scores_smoke_v2.jsonl
 scoring/scores_v2_legacy.jsonl
 scoring/scores_*_merged.jsonl
 router/learned_preds.jsonl
+router/budget_curve.json
 analysis/cost_quality.png
 analysis/table.md
+analysis/report.md
 analysis/__pycache__/
 scoring/_selftest_v2.py
 # proprietary engine + weights — NEVER push (closed for now)
