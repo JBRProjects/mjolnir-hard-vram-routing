@@ -133,10 +133,13 @@ leaked across the train/test split), and a fresh live oracle cycle was collected
 on the new prompt set (540/540 tier-runs, zero errors, 2026-11-11).
 
 Headline numbers on the held-out split: random routing 0.718, oracle 0.927;
-the verifier-gated cascade captures 82.4% of the oracle gap, the cost-aware
-learned router reaches 0.890 at 30.7 s (vs the oracle's 0.927 at 25.7 s), the
-cheap-feature learned router 35.3%, and the hand-written heuristic is *worse
-than random*. Full tables in RESULTS.md.
+the verifier-gated cascade captures 82.4% of the oracle gap, the budgeted
+cost-aware learned router reaches the same quality for 4.3 s less (30.7 s vs
+35.0 s), an oracle-tier classifier captures 35.3%, and the hand-written
+heuristic is *worse than random*. The cost of evicting a tier to escalate is
+measured too (3.9 s turbo / 11.3 s vector / 11.3 s ultra), and charged to the
+cascade it costs +9.6%. Full tables in RESULTS.md; the numbers are regenerated
+from the committed data and checked in CI (`analysis/verify_results.py`).
 
 ## Note
 

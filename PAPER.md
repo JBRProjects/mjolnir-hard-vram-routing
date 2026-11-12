@@ -131,13 +131,20 @@ See RESULTS.md for the full tables. Headline findings on live hardware:
 * **the best implementable policies are the verifier-gated cascade and the
   cost-aware learned router**, not the cheap-feature classifier: the verified
   cascade captures 82.4% of the oracle gap (0.890 at 35.0 s), the cost-aware
-  router reaches the same quality for 30.7 s (lambda = 0.10, ~96% of the
-  oracle quality at ~1.2x the oracle cost), while the 7-feature learned router
-  captures only 35.3% because it mostly learns the 81%-turbo prior.
+  router reaches the same quality for 30.7 s (lambda = 0.1, selected on the
+  training split against a budget of 1.2x the train oracle cost), while a
+  classifier over the *oracle tier* captures only 35.3% because it mostly
+  learns the 81%-turbo prior. How the learned router is formulated matters
+  more than its features: modelling `P(correct | x, t)` and routing with a
+  cost penalty is what unlocks the gap.
 * **a heuristic router can be worse than random** (-130% of the gap): routing
   mid-length prompts to vector, the weakest tier on code (0.143), loses to
   uniform routing. Under a fixed memory budget a router needs the *measured*
   tier profile, not just prompt features.
+* **eviction is not free, but it is cheap here**: only one tier fits in the
+  4 GB card, and making a tier resident costs 3.9 s (turbo) / 11.3 s (vector) /
+  11.3 s (ultra). Charging that per escalation moves the verified cascade from
+  34985.9 ms to 38329.6 ms at unchanged quality (+9.6%).
 * live cycle-2 numbers on 180 distinct items: 540/540 tier-runs successful,
   zero errors (2026-11-11).
 
@@ -148,12 +155,14 @@ style, any metric that touches style will decide the experiment. Our first
 cycle produced a clean, publishable-looking table whose main conclusion
 ("route everything to the cheapest tier") was a property of the metric.
 
-*Where routing still fails.* The cheap-feature router is the weak link: with
+*Where routing still fails.* The oracle-tier classifier is the weak link: with
 126 training rows and an oracle label distribution dominated by one tier, the
-classifier has little to learn from. The two policies that do well - the
-verifier-gated cascade and the cost-aware pair model - both exploit structure
-the cheap-feature classifier does not have: a task-specific verifier (unit
-tests) and an explicit per-tier correctness probability with a cost term.
+classifier has little to learn from, and its feature ablation is a mild
+negative result (length-only beats the full 7-feature set). The two policies
+that do well - the verifier-gated cascade and the cost-aware pair model - both
+exploit structure the oracle-tier classifier does not have: a task-specific
+verifier (unit tests) and an explicit per-tier correctness probability with a
+cost term.
 
 *Memory-eviction robustness.* Only one tier is resident at a time, so tier
 switching is a real cost that the latency measurement alone does not include.
