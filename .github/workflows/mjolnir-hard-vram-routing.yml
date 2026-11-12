@@ -38,10 +38,24 @@ jobs:
           analysis/make_plot.py
           analysis/report.py
           analysis/tier_table.py
+          analysis/verify_results.py
           tests/test_mjolnir.py
 
       - name: Unit checks (extraction, execution scoring, routers, eval set)
         run: python tests/test_mjolnir.py
+
+      - name: Published numbers match the committed live data
+        run: |
+          python analysis/verify_results.py
+          python - <<'EOF'
+          import json, pathlib
+          snap = json.loads(pathlib.Path('analysis/results.json').read_text())
+          assert snap['prompts'] == 180, snap['prompts']
+          assert snap['test_prompts'] == 54, snap['test_prompts']
+          assert abs(snap['policies']['oracle']['quality'] - 0.927) < 0.01, snap['policies']['oracle']
+          assert abs(snap['policies']['cascade (verified gate)']['quality'] - 0.890) < 0.01, snap['policies']
+          print("committed results snapshot OK")
+          EOF
 
       - name: Unit check - legacy metric + routers
         run: |
