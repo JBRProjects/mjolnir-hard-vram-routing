@@ -11,7 +11,7 @@ Given a fixed, small memory budget and locally-hosted models with very different
 
 ## Tiers (testbed)
 
-| tier | model | arch | ctx |
+| equivalent tier | model | arch | ctx |
 |------|-------|------|-----|
 | turbo | qwen2 3B | dense 36L, matmul-bound 96.7% | 32768 |
 | vector | qwen3 8B (6 shards) | dense + YaRN 4x, dequant-bound 64.1% | 131072 |
