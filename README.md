@@ -141,6 +141,12 @@ measured too (3.9 s turbo / 11.3 s vector / 11.3 s ultra), and charged to the
 cascade it costs +9.6%. Full tables in RESULTS.md; the numbers are regenerated
 from the committed data and checked in CI (`analysis/verify_results.py`).
 
+## Next steps (filed as issues)
+
+* [#2 On-policy evaluation of the verified cascade](https://github.com/JBRProjects/mjolnir-hard-vram-routing/issues/2) - the cascade numbers are off-policy and ignore the measured tier-switch cost.
+* [#3 Eval set v3](https://github.com/JBRProjects/mjolnir-hard-vram-routing/issues/3) - more distinct items, harder slices, longer prompts, a long-context slice.
+* [#4 Judge-based secondary metric](https://github.com/JBRProjects/mjolnir-hard-vram-routing/issues/4) - the local tiers cannot follow judge instructions, so the secondary metric needs an external grader.
+
 ## Note
 
 Just in clear it wasn't obvious - MJOLNIR is a play on words, not an actual hammer. :)
