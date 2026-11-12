@@ -1,0 +1,228 @@
+{
+ "What is the capital of France?": {
+  "reference": "Paris"
+ },
+ "What is 17 * 23?": {
+  "reference": "391"
+ },
+ "Which element has chemical symbol Fe?": {
+  "reference": "Iron"
+ },
+ "In which year did Apollo 11 land on the Moon?": {
+  "reference": "1969"
+ },
+ "What does CPU stand for?": {
+  "reference": "Central Processing Unit"
+ },
+ "What is the largest planet in the solar system?": {
+  "reference": "Jupiter"
+ },
+ "Who wrote '1984'?": {
+  "reference": "George Orwell"
+ },
+ "What is the boiling point of water at sea level in Celsius?": {
+  "reference": "100"
+ },
+ "Which protocol is used to send email (SMTP/FTP)?": {
+  "reference": "SMTP"
+ },
+ "What data structure uses LIFO order?": {
+  "reference": "Stack"
+ },
+ "A train travels 60 km/h for 2.5 hours. How far does it go? Show steps.": {
+  "reference": "150"
+ },
+ "If all Bloops are Razzies and all Razzies are Lazzies, are all Bloops Lazzies? Explain briefly.": {
+  "reference": "Yes"
+ },
+ "You have 3 boxes labeled Apples, Oranges, Mixed \u2014 all mislabeled. You may pick one fruit from one box. How do you relabel all boxes? Explain.": {
+  "reference": "Mixed"
+ },
+ "A bat and ball cost $1.10 total. The bat costs $1.00 more than the ball. How much is the ball? Explain.": {
+  "reference": "0.05"
+ },
+ "If you flip two fair coins, what is P(at least one head)? Show reasoning.": {
+  "reference": "0.75"
+ },
+ "Write a Python function add(a, b) returning a+b. Output code only.": {
+  "reference": "def add(a, b):\n    return a + b",
+  "fn": "add",
+  "tests": [
+   {
+    "args": [
+     1,
+     2
+    ],
+    "expected": 3
+   },
+   {
+    "args": [
+     0,
+     0
+    ],
+    "expected": 0
+   },
+   {
+    "args": [
+     -4,
+     9
+    ],
+    "expected": 5
+   },
+   {
+    "args": [
+     2.5,
+     2.5
+    ],
+    "expected": 5.0
+   }
+  ]
+ },
+ "Write Python to reverse a string s without [::-1]. Output code only.": {
+  "reference": "def reverse(s):\n    return s[::-1]",
+  "fn": "reverse",
+  "tests": [
+   {
+    "args": [
+     "hello"
+    ],
+    "expected": "olleh"
+   },
+   {
+    "args": [
+     "a"
+    ],
+    "expected": "a"
+   },
+   {
+    "args": [
+     ""
+    ],
+    "expected": ""
+   },
+   {
+    "args": [
+     "abc123"
+    ],
+    "expected": "321cba"
+   }
+  ]
+ },
+ "Write Python factorial(n) iteratively. Output code only.": {
+  "reference": "def factorial(n):\n    r = 1\n    for i in range(2, n + 1):\n        r *= i\n    return r",
+  "fn": "factorial",
+  "tests": [
+   {
+    "args": [
+     0
+    ],
+    "expected": 1
+   },
+   {
+    "args": [
+     1
+    ],
+    "expected": 1
+   },
+   {
+    "args": [
+     5
+    ],
+    "expected": 120
+   },
+   {
+    "args": [
+     10
+    ],
+    "expected": 3628800
+   }
+  ]
+ },
+ "Write Python is_prime(n) returning True/False. Output code only.": {
+  "reference": "def is_prime(n):\n    if n < 2:\n        return False\n    i = 2\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 1\n    return True",
+  "fn": "is_prime",
+  "tests": [
+   {
+    "args": [
+     0
+    ],
+    "expected": false
+   },
+   {
+    "args": [
+     2
+    ],
+    "expected": true
+   },
+   {
+    "args": [
+     9
+    ],
+    "expected": false
+   },
+   {
+    "args": [
+     97
+    ],
+    "expected": true
+   },
+   {
+    "args": [
+     1
+    ],
+    "expected": false
+   }
+  ]
+ },
+ "Write Python fibonacci(n) returning first n numbers as list. Output code only.": {
+  "reference": "def fibonacci(n):\n    out = []\n    a, b = 0, 1\n    for _ in range(n):\n        out.append(a)\n        a, b = b, a + b\n    return out",
+  "fn": "fibonacci",
+  "tests": [
+   {
+    "args": [
+     0
+    ],
+    "expected": []
+   },
+   {
+    "args": [
+     1
+    ],
+    "expected": [
+     0
+    ]
+   },
+   {
+    "args": [
+     7
+    ],
+    "expected": [
+     0,
+     1,
+     1,
+     2,
+     3,
+     5,
+     8
+    ]
+   },
+   {
+    "args": [
+     10
+    ],
+    "expected": [
+     0,
+     1,
+     1,
+     2,
+     3,
+     5,
+     8,
+     13,
+     21,
+     34
+    ]
+   }
+  ]
+ }
+}

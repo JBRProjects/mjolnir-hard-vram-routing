@@ -126,7 +126,8 @@ def mock_main(args, rows):
     with out_p.open("w", encoding="utf-8") as f:
         for i, row in enumerate(rows):
             rec = {"id": row["id"], "task": row["task"], "prompt": row["prompt"],
-                   "reference": row.get("reference", ""), "split": row.get("split", ""), "tiers": {}}
+                   "reference": row.get("reference", ""), "split": row.get("split", ""),
+                   "fn": row.get("fn"), "tests": row.get("tests"), "tiers": {}}
             for tier in args.tiers:
                 rec["tiers"][tier] = dict(mock_run_one(row, tier))
                 if not rec["tiers"][tier].get("error"):
@@ -161,7 +162,8 @@ def main():
     with out_p.open("w", encoding="utf-8") as f:
         for i, row in enumerate(rows):
             rec = {"id": row["id"], "task": row["task"], "prompt": row["prompt"],
-                   "reference": row.get("reference", ""), "split": row.get("split", ""), "tiers": {}}
+                   "reference": row.get("reference", ""), "split": row.get("split", ""),
+                   "fn": row.get("fn"), "tests": row.get("tests"), "tiers": {}}
             for tier in args.tiers:
                 if skip_unhealthy and not health.get(tier, False):
                     rec["tiers"][tier] = {"content": "", "latency_ms": 0, "error": "skipped_unhealthy"}
