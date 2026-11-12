@@ -161,8 +161,11 @@ should add the swap cost explicitly. The v2 run also shows the cost profile
 itself is prompt-dependent (vector went from 36.0 s to 49.6 s on the harder
 v2 prompt set), which matters for any budget-aware router.
 
-*Next cycle.* (i) a judge-based secondary metric over the full v2 set (the
-code path is in place and was used for a validation subset), (ii) an
+*Next cycle.* (i) a judge-based secondary metric over the full v2 set - but
+cycle 2 showed the tiers cannot serve as judges (they are completion-style
+models: ultra spends its verdict budget on a `<think>` trace, turbo's verdicts
+contradict its own explanations, agreement with the primary metric 0.543), so
+this needs an external grader rather than another local tier; (ii) an
 on-policy evaluation of the cascade (the current numbers are off-policy, i.e.
 the measured latency and quality of the tier the policy would have picked),
 (iii) more than three tiers and a real eviction schedule.

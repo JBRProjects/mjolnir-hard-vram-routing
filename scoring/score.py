@@ -181,9 +181,26 @@ def v2_code(output, reference, fn=None, tests=None):
 
 
 # ------------------------------------------------------------------ judge (v2)
-JUDGE_TMPL = ("You are a strict grader. Question: {q}\nExpected answer: {ref}\n"
-              "Candidate answer: {cand}\nDoes the candidate answer correctly and completely "
-              "relative to the expected answer? Reply with exactly YES or NO.")
+# The judge is a tier of the same stack (often turbo: it is the cheapest and the
+# fastest), so the prompt carries two worked examples: without them the small
+# models answer with a bare verdict that contradicts their own explanation
+# ("NO - the candidate answer is correct ..."). The examples anchor both the
+# output format and the strictness.
+JUDGE_TMPL = (
+    "You are a strict grader. Reply with exactly one word: YES or NO.\n\n"
+    "Question: What is the capital of France?\n"
+    "Expected answer: Paris\n"
+    "Candidate answer: The capital of France is Paris.\n"
+    "Is the candidate correct? YES\n\n"
+    "Question: What is 17 * 23?\n"
+    "Expected answer: 391\n"
+    "Candidate answer: 17 * 23 = 390.\n"
+    "Is the candidate correct? NO\n\n"
+    "Question: {q}\n"
+    "Expected answer: {ref}\n"
+    "Candidate answer: {cand}\n"
+    "Is the candidate correct?"
+)
 
 
 def judge_once(url, prompt_text, timeout=120):
@@ -297,7 +314,7 @@ def judge_agreement(out, judged):
     for a in (0, 1):
         for b in (0, 1):
             pe += (sum(1 for x, y in pairs if x == a) / n) * (sum(1 for x, y in pairs if y == b) / n)
-    kappa = (po - pe) / (1 - pe) if pe < 1 else 0.0
+    kappa = (po - pe) / (1 - pe) if pe < 1 - 1e-9 else None
     return {"judged": n, "agreement": agree, "kappa": kappa,
             "per_tier": {t: (sum(1 for a, b in v if a == b) / len(v), len(v)) for t, v in per_tier.items()}}
 
@@ -381,10 +398,11 @@ def main():
     if judged:
         ag = judge_agreement(out, judged)
         if ag:
+            k = ag["kappa"]
             print(f"[judge] metric agreement on {ag['judged']} judged tier-runs: "
-                  f"agreement={ag['agreement']:.3f} kappa={ag['kappa']:.3f}")
-            for tier, (a, k) in ag["per_tier"].items():
-                print(f"[judge]   {tier:7s} agreement={a:.3f} (n={k})")
+                  f"agreement={ag['agreement']:.3f} kappa={('n/a' if k is None else f'{k:.3f}')}")
+            for tier, (a, n) in ag["per_tier"].items():
+                print(f"[judge]   {tier:7s} agreement={a:.3f} (n={n})")
 
 
 if __name__ == "__main__":

@@ -256,11 +256,37 @@ the prior. The pair model used by the cost-aware router (which adds
 prompt-type x tier interactions) is the variant that recovers the tier
 structure.
 
-#### Judge validation (secondary metric)
+#### 2.5 Judge validation (secondary metric) — negative result
 
-`scoring/score.py --judge-url ... --judge-mode all` grades the tiers with
-ultra acting as the judge; the primary metric is compared with the judge on the
-judged subset (agreement and Cohen's kappa). See 2.5.
+`scoring/score.py --judge-url ... --judge-mode all` grades the tiers with a
+tier acting as the judge and compares the verdict with the primary metric
+(agreement + Cohen's kappa). The mechanism works; **the tiers are not usable
+as judges**:
+
+* **ultra as judge** opens a `<think>` block and spends its token budget on the
+  reasoning trace: with an 8-token budget only 3 of 24 calls produced a parsable
+  verdict. With a 64-token budget it answers, but a single judgement costs
+  ~70 s of prefill plus generation on this hardware - roughly the cost of a
+  real query, so a judge-based metric would be as expensive as the workload it
+  is supposed to measure.
+* **turbo as judge** answers immediately (35 of 36 calls parsable) but its
+  verdicts frequently contradict its own explanation - e.g. `NO` followed by
+  *"The candidate answer 'Python' is correct in identifying the programming
+  language created"*. Agreement with the primary metric: **0.543** (kappa
+  undefined: the judge answered NO almost everywhere, so the chance agreement
+  is 1). Per candidate tier: turbo 0.667 (n=12), ultra 0.500 (n=12), vector
+  0.455 (n=11).
+
+The underlying reason is structural: the tiers are completion-style models
+served through `/completion`, so a judge instruction is just more text for them
+to continue, not a command to obey. Two consequences for the paper:
+
+1. a judge-based secondary metric needs a *stronger* judge than the local
+   stack (an external grader, or a bigger tier with a chat template applied) -
+   it cannot be produced by the tiers themselves;
+2. this is exactly why the cycle-2 primary metric is **execution-based**: unit
+   tests are checkable by a reviewer without trusting any model's opinion,
+   including turbo's.
 
 ## Cycle 1 — tier characterization and first oracle
 

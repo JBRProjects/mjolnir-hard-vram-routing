@@ -65,7 +65,13 @@ Metric v2 is defined as a *pipeline* from raw completion to a scalar quality:
      punctuation, articles, units, thousands separators) and compare it to the
      gold answer semantically (exact, numeric equality, or short containment).
 4. **Fall back** to judge scoring (ultra as judge) on the prompts where tiers
-   disagree, as a secondary/robustness metric.
+   disagree, as a secondary/robustness metric. *Measured outcome (cycle 2):
+   the tiers cannot serve as judges* - they are completion-style models that
+   continue the instruction instead of obeying it (ultra spends its token
+   budget on a `<think>` trace, turbo's verdicts contradict its own
+   explanations; agreement with the primary metric 0.543). A judge-based
+   secondary metric therefore needs an external grader, not another local
+   tier - which is a further argument for the execution-based primary metric.
 
 Consequences for the formalization: the quality function `q_i(x)` becomes
 *verifiable* rather than stylistic, the oracle label stops collapsing onto the
