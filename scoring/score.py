@@ -243,12 +243,12 @@ def run_judge(rows, url, max_calls, tasks=None, mode="disagree", max_chars=1500)
         for t in targets:
             content = tiers[t].get("content", "")
             if not content.strip(): continue
+            n += 1                      # every attempt counts against the budget
             reply = judge_once(url, JUDGE_TMPL.format(q=r.get("prompt", ""), ref=r.get("reference", ""),
                                                       cand=trim_continuation(content)[:max_chars]))
             if reply is None:
-                continue
+                continue                # unparsable verdict: not recorded, not a NO
             out[r["id"]][t] = 1.0 if reply == "yes" else 0.0
-            n += 1
             if n >= max_calls: break
     return dict(out), n
 
