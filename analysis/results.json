@@ -1,0 +1,190 @@
+{
+ "ablation": [
+  {
+   "agreement": 0.8703703703703703,
+   "capture": 51.79704016913322,
+   "cost_ms": 22012.07819444439,
+   "n_features": 2,
+   "quality": 0.8101851851851852,
+   "subset": "length only"
+  },
+  {
+   "agreement": 0.8333333333333334,
+   "capture": 36.575052854122625,
+   "cost_ms": 20756.972903703743,
+   "n_features": 3,
+   "quality": 0.7731481481481481,
+   "subset": "task keywords only"
+  },
+  {
+   "agreement": 0.8333333333333334,
+   "capture": 36.575052854122625,
+   "cost_ms": 20756.972903703743,
+   "n_features": 2,
+   "quality": 0.7731481481481481,
+   "subset": "surface ratios only"
+  },
+  {
+   "agreement": 0.8518518518518519,
+   "capture": 44.1860465116279,
+   "cost_ms": 21466.57060925921,
+   "n_features": 7,
+   "quality": 0.7916666666666666,
+   "subset": "all features"
+  }
+ ],
+ "frontier": [
+  {
+   "cost_ms": 50361.614,
+   "lambda": 0.0,
+   "mix": {
+    "turbo": 0,
+    "ultra": 54,
+    "vector": 0
+   },
+   "quality": 0.871914
+  },
+  {
+   "cost_ms": 36979.864,
+   "lambda": 0.05,
+   "mix": {
+    "turbo": 25,
+    "ultra": 29,
+    "vector": 0
+   },
+   "quality": 0.871914
+  },
+  {
+   "cost_ms": 30698.961,
+   "lambda": 0.1,
+   "mix": {
+    "turbo": 36,
+    "ultra": 18,
+    "vector": 0
+   },
+   "quality": 0.890432
+  },
+  {
+   "cost_ms": 23542.228,
+   "lambda": 0.2,
+   "mix": {
+    "turbo": 49,
+    "ultra": 5,
+    "vector": 0
+   },
+   "quality": 0.773148
+  },
+  {
+   "cost_ms": 20756.973,
+   "lambda": 0.4,
+   "mix": {
+    "turbo": 54,
+    "ultra": 0,
+    "vector": 0
+   },
+   "quality": 0.773148
+  },
+  {
+   "cost_ms": 20756.973,
+   "lambda": 0.8,
+   "mix": {
+    "turbo": 54,
+    "ultra": 0,
+    "vector": 0
+   },
+   "quality": 0.773148
+  },
+  {
+   "cost_ms": 20756.973,
+   "lambda": 1.6,
+   "mix": {
+    "turbo": 54,
+    "ultra": 0,
+    "vector": 0
+   },
+   "quality": 0.773148
+  }
+ ],
+ "oracle_distribution": {
+  "turbo": 146,
+  "ultra": 28,
+  "vector": 6
+ },
+ "per_task_quality": {
+  "code_gen": {
+   "turbo": 0.659167,
+   "ultra": 0.968056,
+   "vector": 0.143333
+  },
+  "factual_qa": {
+   "turbo": 0.916667,
+   "ultra": 0.916667,
+   "vector": 0.733333
+  },
+  "reasoning": {
+   "turbo": 0.783333,
+   "ultra": 0.816667,
+   "vector": 0.55
+  }
+ },
+ "policies": {
+  "cascade (confidence gate)": {
+   "capture_pct": 26.471,
+   "cost_ms": 20756.973,
+   "quality": 0.773148
+  },
+  "cascade (verified gate)": {
+   "capture_pct": 82.353,
+   "cost_ms": 34985.91,
+   "quality": 0.890432
+  },
+  "heuristic": {
+   "capture_pct": -130.147,
+   "cost_ms": 41675.517,
+   "quality": 0.444444
+  },
+  "learned": {
+   "capture_pct": 35.294,
+   "cost_ms": 21466.571,
+   "quality": 0.791667
+  },
+  "oracle": {
+   "capture_pct": 100.0,
+   "cost_ms": 25737.333,
+   "quality": 0.927469
+  },
+  "random": {
+   "capture_pct": 0.0,
+   "cost_ms": 42016.866,
+   "quality": 0.717593
+  }
+ },
+ "prompts": 180,
+ "test_prompts": 54,
+ "tiers": {
+  "turbo": {
+   "avg_latency_s": 20.279,
+   "avg_tok_per_s": 6.5377,
+   "errors": 0,
+   "median_latency_s": 19.74,
+   "p90_latency_s": 25.255,
+   "runs": 180
+  },
+  "ultra": {
+   "avg_latency_s": 49.911,
+   "avg_tok_per_s": 2.5946,
+   "errors": 0,
+   "median_latency_s": 48.607,
+   "p90_latency_s": 57.221,
+   "runs": 180
+  },
+  "vector": {
+   "avg_latency_s": 49.56,
+   "avg_tok_per_s": 2.6662,
+   "errors": 0,
+   "median_latency_s": 48.163,
+   "p90_latency_s": 60.267,
+   "runs": 180
+  }
+ }
+}

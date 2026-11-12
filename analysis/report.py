@@ -9,9 +9,14 @@ block with:
   * the cost-aware learned router's quality/cost frontier
   * the router feature ablation
 
+With --json it also writes a machine-readable snapshot of the same numbers
+(analysis/results.json); analysis/verify_results.py recomputes them and checks
+that the committed snapshot still matches, so the published numbers cannot
+drift away from the committed data.
+
 Usage:
   python analysis/report.py --in harness/oracle_v2.jsonl --scores scoring/scores.jsonl \
-      [--out analysis/report.md]
+      [--out analysis/report.md] [--json analysis/results.json]
 """
 import argparse, collections, json, pathlib, statistics, sys
 
@@ -36,6 +41,7 @@ def main():
     ap.add_argument("--in", dest="inp", default=str(BASE / "harness" / "oracle_v2.jsonl"))
     ap.add_argument("--scores", default=str(BASE / "scoring" / "scores.jsonl"))
     ap.add_argument("--out", default=str(BASE / "analysis" / "report.md"))
+    ap.add_argument("--json", default="", help="also write a machine-readable snapshot of the numbers")
     args = ap.parse_args()
     if not pathlib.Path(args.inp).exists():
         print(f"no oracle file at {args.inp}"); return
@@ -47,6 +53,9 @@ def main():
     test = [r for r in rows if r.get("split") != "train"] or rows
     out = []
     A = out.append
+    snap = {"prompts": len(rows), "test_prompts": len(test),
+            "tiers": {}, "per_task_quality": {}, "oracle_distribution": {},
+            "policies": {}, "frontier": [], "ablation": []}
 
     A(f"## Report: `{pathlib.Path(args.inp).name}` / `{pathlib.Path(args.scores).name}`\n")
     A(f"Prompts: {len(rows)} (test split: {len(test)})\n")
@@ -75,6 +84,11 @@ def main():
         A(f"| {t} | {runs} | {errs} | {statistics.mean(lat) if lat else 0:.1f} | "
           f"{statistics.median(lat) if lat else 0:.1f} | "
           f"{pct(lat, 0.9):.1f} | {avg_tps:.2f} |")
+        snap["tiers"][t] = {"runs": runs, "errors": errs,
+                            "avg_latency_s": round(statistics.mean(lat) if lat else 0.0, 3),
+                            "median_latency_s": round(statistics.median(lat) if lat else 0.0, 3),
+                            "p90_latency_s": round(pct(lat, 0.9), 3),
+                            "avg_tok_per_s": round(avg_tps, 4)}
 
     # per-task quality
     tasks = sorted({r["task"] for r in rows})
@@ -86,8 +100,10 @@ def main():
         for t, e in (r.get("tiers") or {}).items():
             per[r["task"]][t].append(e.get("quality", 0.0))
     for task in tasks:
+        vals = {t: (sum(per[task][t]) / len(per[task][t]) if per[task].get(t) else None) for t in TIER_ORDER}
         A(f"| {task} | " + " | ".join(
-            f"{sum(per[task][t])/len(per[task][t]):.3f}" if per[task].get(t) else "n/a" for t in TIER_ORDER) + " |")
+            f"{vals[t]:.3f}" if vals[t] is not None else "n/a" for t in TIER_ORDER) + " |")
+        snap["per_task_quality"][task] = {t: (round(v, 6) if v is not None else None) for t, v in vals.items()}
 
     # oracle distribution
     A("\n### Oracle tier distribution\n")
@@ -97,6 +113,7 @@ def main():
     for t in TIER_ORDER:
         n = dist.get(t, 0)
         A(f"| {t} | {n} | {n/max(1,len(rows)):.3f} |")
+        snap["oracle_distribution"][t] = n
 
     # per-task oracle distribution: which tier is worth paying for on which task
     A("\n### Oracle tier distribution per task\n")
@@ -169,6 +186,8 @@ def main():
         cap = 0.0 if k == "random" else (100.0 if k == "oracle" else
                (100.0 * (q - q_floor) / (q_ceil - q_floor) if q_ceil > q_floor else 0.0))
         A(f"| {k} | {c:.1f} | {q:.3f} | {cap:.1f}% |")
+        snap["policies"][k] = {"cost_ms": round(c, 3), "quality": round(q, 6),
+                                "capture_pct": round(cap, 3)}
 
     # budget curve
     try:
@@ -180,6 +199,8 @@ def main():
         for p in curve:
             mix = ", ".join(f"{t}:{p['mix'][t]}" for t in TIER_ORDER)
             A(f"| {p['lambda']:.2f} | {p['cost_ms']:.1f} | {p['quality']:.3f} | {mix} |")
+            snap["frontier"].append({"lambda": p["lambda"], "cost_ms": round(p["cost_ms"], 3),
+                                     "quality": round(p["quality"], 6), "mix": p["mix"]})
     except Exception as e:
         A(f"\n(budget curve unavailable: {e})\n")
 
@@ -192,6 +213,7 @@ def main():
         for row in ablation(args.scores):
             A(f"| {row['subset']} | {row['agreement']:.3f} | {row['cost_ms']:.1f} | "
               f"{row['quality']:.3f} | {row['capture']:.1f}% |")
+            snap["ablation"].append(row)
     except Exception as e:
         A(f"\n(ablation unavailable: {e})\n")
 
@@ -199,6 +221,10 @@ def main():
     pathlib.Path(args.out).write_text(text, encoding="utf-8")
     print(text)
     print(f"\nwrote {args.out}")
+    if getattr(args, "json", None):
+        pathlib.Path(args.json).write_text(json.dumps(snap, indent=1, sort_keys=True), encoding="utf-8")
+        print(f"wrote {args.json}")
+    return snap
 
 
 if __name__ == "__main__":
