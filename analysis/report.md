@@ -38,6 +38,9 @@ Prompts: 180 (test split: 54)
 Measured tier load/eviction cost (ms): turbo=3880, vector=11260, ultra=11310
 
 
+Cost-aware learned router: lambda=0.1 selected on the training split (budget 31246 ms = 1.2x the train-split oracle cost).
+
+
 ### Router comparison (held-out test split)
 
 | policy | avg cost (ms) | quality | oracle-gap captured (%) |
@@ -49,6 +52,7 @@ Measured tier load/eviction cost (ms): turbo=3880, vector=11260, ultra=11310
 | learned | 21466.6 | 0.792 | 35.3% |
 | oracle | 25737.3 | 0.927 | 100.0% |
 | cascade (verified gate + tier switch) | 38329.6 | 0.890 | 82.4% |
+| learned (cost-aware, budgeted) | 30699.0 | 0.890 | 82.4% |
 
 ### Cost-aware learned router: quality/cost frontier (sklearn-logreg (n=378))
 

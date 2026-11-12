@@ -118,6 +118,22 @@ def main():
     if switch_costs:
         pts["cascade-verified+switch"] = eval_policy(
             lambda r: cascade_verified_policy(r, switch_costs), True)
+
+    # cost-aware learned router with a latency budget chosen on the TRAIN split
+    try:
+        from router import budget_router
+        lam, budget, tr_cost, tr_q, note = budget_router.select_lambda(rows)
+        prob, _ = budget_router.fit_pair_model(rows)
+        lat = budget_router.tier_latency([r for r in rows if r.get("split") == "train"] or rows)
+        pts["learned-cost-aware"] = eval_policy(
+            lambda r: max(TIER_ORDER,
+                          key=lambda t: (prob(r.get("prompt", ""), t)
+                                         - lam * (lat.get(t, 0.0) / (min(v for v in lat.values() if v != float("inf")) or 1.0)))),
+            False)
+        print(f"[budget] cost-aware learned router: lambda={lam} chosen on the train split "
+              f"(budget {budget:.0f} ms = 1.2x the train oracle cost)")
+    except Exception as e:
+        print(f"[budget] cost-aware router unavailable: {e}")
     q_floor, q_ceil = pts["random"][1], pts["oracle"][1]
 
     def capture(k):

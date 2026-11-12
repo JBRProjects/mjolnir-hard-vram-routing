@@ -185,6 +185,22 @@ def main():
             lambda r: p_cascade_verified(r, switch_costs), True)
         A(f"\nMeasured tier load/eviction cost (ms): "
           + ", ".join(f"{t}={switch_costs[t]:.0f}" for t in TIER_ORDER if t in switch_costs) + "\n")
+
+    # cost-aware learned router, latency budget chosen on the TRAIN split
+    try:
+        from router import budget_router
+        lam, budget, tr_cost, tr_q, note = budget_router.select_lambda(rows)
+        prob, _ = budget_router.fit_pair_model(rows)
+        lat = budget_router.tier_latency([r for r in rows if r.get("split") == "train"] or rows)
+        unit = min(v for v in lat.values() if v != float("inf")) or 1.0
+        pts["learned (cost-aware, budgeted)"] = eval_policy(
+            lambda r: max(TIER_ORDER,
+                          key=lambda t: prob(r.get("prompt", ""), t) - lam * (lat.get(t, 0.0) / unit)),
+            False)
+        A(f"\nCost-aware learned router: lambda={lam} selected on the training split "
+          f"(budget {budget:.0f} ms = 1.2x the train-split oracle cost).\n")
+    except Exception as e:
+        A(f"\n(cost-aware router unavailable: {e})\n")
     q_floor, q_ceil = pts["random"][1], pts["oracle"][1]
     A("\n### Router comparison (held-out test split)\n")
     A("| policy | avg cost (ms) | quality | oracle-gap captured (%) |")

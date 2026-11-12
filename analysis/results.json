@@ -153,6 +153,11 @@
    "cost_ms": 21466.571,
    "quality": 0.791667
   },
+  "learned (cost-aware, budgeted)": {
+   "capture_pct": 82.353,
+   "cost_ms": 30698.961,
+   "quality": 0.890432
+  },
   "oracle": {
    "capture_pct": 100.0,
    "cost_ms": 25737.333,

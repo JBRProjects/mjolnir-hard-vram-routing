@@ -106,19 +106,13 @@ def fit_pair_model(scores):
         return prob, f"constant({base:.2f}) (sklearn missing)"
 
 
-def curve(scores, lams=None):
-    train = [r for r in scores if r.get("split") == "train"]
-    test = [r for r in scores if r.get("split") != "train"] or scores
-    prob, note = fit_pair_model(scores)
-    lat = tier_latency(train or scores)
-    # cost is expressed in units of the cheapest tier so lambda is interpretable
+def evaluate_on(rows, prob, lat, lams):
+    """Evaluate the cost-aware rule on an arbitrary set of rows."""
     unit = min(v for v in lat.values() if v != float("inf")) or 1.0
-    if lams is None:
-        lams = [0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6]
     out = []
     for lam in lams:
         costs, qs, picks = [], [], []
-        for r in test:
+        for r in rows:
             best_t, best_v = None, None
             for t in TIER_ORDER:
                 v = prob(r.get("prompt", ""), t) - lam * (lat.get(t, 0.0) / unit)
@@ -132,7 +126,44 @@ def curve(scores, lams=None):
                     "cost_ms": sum(costs) / max(1, len(costs)),
                     "quality": sum(qs) / max(1, len(qs)),
                     "mix": {t: picks.count(t) for t in TIER_ORDER}})
-    return out, lat, note
+    return out
+
+
+def curve(scores, lams=None):
+    train = [r for r in scores if r.get("split") == "train"]
+    test = [r for r in scores if r.get("split") != "train"] or scores
+    prob, note = fit_pair_model(scores)
+    lat = tier_latency(train or scores)
+    if lams is None:
+        lams = [0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6]
+    return evaluate_on(test, prob, lat, lams), lat, note
+
+
+def select_lambda(scores, budget_factor=1.2, lams=None):
+    """Pick the cost penalty on the TRAIN split for a latency budget.
+
+    The budget is `budget_factor` times the average cost of the oracle on the
+    training split: "as much as the hindsight-optimal router, plus a margin".
+    Among the penalties whose TRAIN cost stays inside the budget, the one with
+    the highest train quality is chosen; the penalty is then applied to the
+    held-out split. (The budget and the penalty are therefore never chosen on
+    the data they are reported on.)
+
+    Returns (lambda, budget_ms, train_cost_ms, train_quality, note).
+    """
+    train = [r for r in scores if r.get("split") == "train"] or scores
+    prob, note = fit_pair_model(scores)
+    lat = tier_latency(train)
+    if lams is None:
+        lams = [0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6]
+    oracle_cost = sum((r.get("tiers", {}).get(r["oracle"]) or {}).get("latency_ms", 0)
+                      for r in train) / max(1, len(train))
+    budget = budget_factor * oracle_cost
+    tr_pts = evaluate_on(train, prob, lat, lams)
+    inside = [p for p in tr_pts if p["cost_ms"] <= budget]
+    best = max(inside, key=lambda p: (p["quality"], -p["cost_ms"])) if inside else \
+        max(tr_pts, key=lambda p: p["quality"])
+    return best["lambda"], budget, best["cost_ms"], best["quality"], note
 
 
 def main():

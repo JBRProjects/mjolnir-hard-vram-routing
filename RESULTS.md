@@ -194,8 +194,10 @@ escalation.
 | random | 42016.9 | 0.718 | 0.0% (floor) |
 | heuristic | 41675.5 | 0.444 | **-130.1%** |
 | cascade (confidence gate) | 20757.0 | 0.773 | 26.5% |
-| cascade (verified gate) | 34985.9 | 0.890 | 82.4% |
-| learned (logreg, 7 features) | 21466.6 | 0.792 | 35.3% |
+| cascade (verified gate) | 34985.9 | **0.890** | **82.4%** |
+| cascade (verified gate + tier switch) | 38329.6 | 0.890 | 82.4% |
+| learned (logreg over oracle tiers, 7 features) | 21466.6 | 0.792 | 35.3% |
+| learned (cost-aware pair model, budgeted) | 30699.0 | **0.890** | **82.4%** |
 | oracle | 25737.3 | 0.927 | 100% (ceiling) |
 
 Reading:
@@ -208,17 +210,22 @@ Reading:
   router built on prompt surface features without the measured tier
   profile can lose to random routing - worth stating explicitly, because it is
   the failure mode a reviewer will look for;
-* **the verified cascade is the strongest single policy** (82.4% of the gap at
-  35.0 s): it starts at turbo and escalates only when the task-specific
-  verifier rejects the cheap answer, so it pays for ultra exactly where the
-  unit tests say turbo was wrong;
+* **the verified cascade is a strong baseline** (82.4% of the gap at 35.0 s):
+  it starts at turbo and escalates only when the task-specific verifier
+  rejects the cheap answer, so it pays for ultra exactly where the unit tests
+  say turbo was wrong;
 * **the confidence-gated cascade buys speed, not quality** (26.5% at 20.8 s):
   the surface proxy accepts nearly every turbo answer, so it is a
   turbo-only policy;
-* **the learned router on cheap features is beaten by the verified cascade**
-  (35.3% vs 82.4%): with an oracle that is 81% turbo, a 7-feature classifier
-  mostly learns "turbo", and the feature ablation shows the full feature set
-  is not even the best subset here.
+* **how the learned router is formulated matters more than its features.**
+  Classifying the oracle tier from 7 prompt features captures only 35.3% of
+  the gap: with an oracle label distribution that is 81% turbo, the classifier
+  mostly learns the prior (the feature ablation below shows that even the best
+  single feature family reaches only 51.8%). Modelling `P(correct | x, t)` per
+  tier and routing with a cost penalty instead captures 82.4% of the gap - the
+  same quality as the verified cascade for 4.3 s less, with the latency budget
+  (1.2x the training-split oracle cost) chosen on the training split, never on
+  the reported split.
 
 #### Cost-aware learned router: quality/cost frontier
 
