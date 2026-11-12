@@ -88,17 +88,46 @@ def gate(task: str, content: str, fn=None, tests=None) -> bool:
     return bool(extract_answer(content).strip())
 
 
-def cascade_verified(task: str, content_by_tier: dict, latency_by_tier: dict, fn=None, tests=None):
+def cascade_verified(task: str, content_by_tier: dict, latency_by_tier: dict, fn=None, tests=None,
+                     switch_ms: dict = None):
     """Off-policy cascade with the task-specific verifier.
 
     Walks turbo -> vector -> ultra, pays for every attempted tier, and stops at
     the first tier the verifier accepts. Returns (final_tier, total_cost_ms).
+
+    `switch_ms` optionally maps a tier to the measured cost of making it
+    resident (evict the current tier + load the next one; see
+    harness/measure_switch.ps1). Only one tier fits in VRAM, so every
+    escalation really does pay that price - without it the cascade numbers are
+    optimistic.
     """
+    switch_ms = switch_ms or {}
     total = 0.0
+    first = True
     for tier in ("turbo", "vector", "ultra"):
+        if not first:
+            total += switch_ms.get(tier, 0.0)
+        first = False
         total += latency_by_tier.get(tier, 0.0)
         if tier == "ultra":
             return tier, total
         if gate(task, content_by_tier.get(tier, ""), fn, tests):
             return tier, total
     return "ultra", total
+
+
+def load_switch_costs(path=None) -> dict:
+    """Measured tier load/eviction costs (ms) from harness/switch_cost.json."""
+    import json, pathlib
+    if path is None:
+        path = pathlib.Path(__file__).parent.parent / "harness" / "switch_cost.json"
+    p = pathlib.Path(path)
+    if not p.exists():
+        return {}
+    try:
+        # utf-8-sig: the file is written by PowerShell, which may add a BOM
+        data = json.loads(p.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return {}
+    loads = data.get("load_seconds") or {}
+    return {k: float(v) * 1000.0 for k, v in loads.items()}

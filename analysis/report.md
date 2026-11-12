@@ -35,6 +35,9 @@ Prompts: 180 (test split: 54)
 | factual_qa | 58 (0.97) | 1 (0.02) | 1 (0.02) |
 | reasoning | 51 (0.85) | 2 (0.03) | 7 (0.12) |
 
+Measured tier load/eviction cost (ms): turbo=3880, vector=11260, ultra=11310
+
+
 ### Router comparison (held-out test split)
 
 | policy | avg cost (ms) | quality | oracle-gap captured (%) |
@@ -45,6 +48,7 @@ Prompts: 180 (test split: 54)
 | cascade (verified gate) | 34985.9 | 0.890 | 82.4% |
 | learned | 21466.6 | 0.792 | 35.3% |
 | oracle | 25737.3 | 0.927 | 100.0% |
+| cascade (verified gate + tier switch) | 38329.6 | 0.890 | 82.4% |
 
 ### Cost-aware learned router: quality/cost frontier (sklearn-logreg (n=378))
 

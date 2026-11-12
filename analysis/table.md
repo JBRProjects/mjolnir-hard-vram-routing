@@ -6,6 +6,7 @@
 | cascade-verified | 34985.9 | 0.890 | 82.4% |
 | learned | 21466.6 | 0.792 | 35.3% |
 | oracle | 25737.3 | 0.927 | 100.0% |
+| cascade-verified+switch | 38329.6 | 0.890 | 82.4% |
 
 ## Per-task quality on the test split
 

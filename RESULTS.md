@@ -256,6 +256,36 @@ the prior. The pair model used by the cost-aware router (which adds
 prompt-type x tier interactions) is the variant that recovers the tier
 structure.
 
+#### 2.4b What the memory budget costs: the measured tier switch
+
+Only one tier fits in the 4 GB card at a time, so a cascade that escalates must
+*evict* the resident tier and *load* the next one. The cascade numbers above
+charge only generation latency, so they are optimistic. `harness/measure_switch.ps1`
+measures that cost directly (process launch -> `/health` 200, at the evaluation
+operating point `-c 2048`):
+
+| tier | shards | load + health |
+|---|---|---|
+| turbo | 1 file, 2.1 GB | **3.9 s** |
+| vector | 6 files, ~5 GB | **11.3 s** |
+| ultra | 7 files, ~6 GB | **11.3 s** |
+
+Re-running the verified cascade with those costs charged per escalation
+(`cascade (verified gate + tier switch)` in `analysis/report.md`):
+
+| policy | avg cost (ms) | quality | oracle-gap captured (%) |
+|---|---|---|---|
+| cascade (verified gate) | 34985.9 | 0.890 | 82.4% |
+| cascade (verified gate + tier switch) | 38329.6 | 0.890 | 82.4% |
+
+The eviction cost is **+9.6%** on the cascade's average request, because only
+the queries that escalate pay it (a turbo -> ultra escalation costs 11.3 s of
+loading, against ~30 s of generation saved). The quality picture does not
+change, but the honest number is the second row: under a hard memory budget,
+switching is not free — it is small here only because the models are small
+enough to load in seconds and the tiers are few.
+
+
 #### 2.5 Judge validation (secondary metric) — negative result
 
 `scoring/score.py --judge-url ... --judge-mode all` grades the tiers with a

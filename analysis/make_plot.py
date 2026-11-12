@@ -81,13 +81,18 @@ def main():
                 break
         return chosen, total
 
-    def cascade_verified_policy(r):
+    def cascade_verified_policy(r, switch_ms=None):
         tiers = r.get("tiers", {})
         contents = {t: _artifact(r, t) for t in TIER_ORDER}
         lat = {t: (tiers.get(t) or {}).get("latency_ms", 0) for t in TIER_ORDER}
         chosen, total = cascade.cascade_verified(r.get("task", ""), contents, lat,
-                                                 r.get("fn"), r.get("tests"))
+                                                 r.get("fn"), r.get("tests"), switch_ms)
         return chosen, total
+
+    switch_costs = cascade.load_switch_costs()
+    if switch_costs:
+        print(f"[switch] measured tier load costs (ms): "
+              + ", ".join(f"{t}={switch_costs[t]:.0f}" for t in TIER_ORDER if t in switch_costs))
 
     def eval_policy(chooser, accumulate_cost):
         costs, qs = [], []
@@ -110,6 +115,9 @@ def main():
         "learned": eval_policy(lambda r: preds.get(r.get("id"), "turbo"), False) if preds else (0.0, 0.0),
         "oracle": eval_policy(lambda r: r["oracle"], False),
     }
+    if switch_costs:
+        pts["cascade-verified+switch"] = eval_policy(
+            lambda r: cascade_verified_policy(r, switch_costs), True)
     q_floor, q_ceil = pts["random"][1], pts["oracle"][1]
 
     def capture(k):

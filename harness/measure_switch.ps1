@@ -30,23 +30,22 @@ foreach ($tier in $Tiers) {
     & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "bringup.ps1") -Tier $tier -Kill | Out-Null
     Start-Sleep -Seconds 3
 
+    # bringup.ps1 blocks until the tier is HEALTHY (or times out), so the elapsed
+    # time around the call IS the eviction+load cost.
+    # NOTE: the call must NOT be piped: on Windows a piped stdout keeps the
+    # redirected log handle of the spawned server open, and the caller would
+    # block until the server exits.
     $t0 = Get-Date
-    $proc = Start-Process -FilePath powershell -ArgumentList @(
-        "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "bringup.ps1"),
-        "-Tier", $tier, "-EvalCtx", "$EvalCtx", "-TimeoutSec", "$TimeoutSec"
-    ) -PassThru -WindowStyle Hidden
-    $deadline = (Get-Date).AddSeconds($TimeoutSec)
-    $ok = $false
-    while ((Get-Date) -lt $deadline) {
-        try {
-            $r = Invoke-WebRequest -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2 -UseBasicParsing
-            if ($r.StatusCode -eq 200) { $ok = $true; break }
-        } catch { }
-        Start-Sleep -Milliseconds 500
-    }
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "bringup.ps1") `
+        -Tier $tier -EvalCtx $EvalCtx -TimeoutSec $TimeoutSec
     $loadSec = ((Get-Date) - $t0).TotalSeconds
-    if (-not $ok) { Write-Output "[switch] $tier did not become healthy in time"; continue }
-    # let the engine settle (first request also pays a warm-up cost)
+    $ok = $false
+    try {
+        $r = Invoke-WebRequest -Uri "http://127.0.0.1:$port/health" -TimeoutSec 5 -UseBasicParsing
+        $ok = ($r.StatusCode -eq 200)
+    } catch { }
+    if (-not $ok) { Write-Output "[switch] $tier did not become healthy (${loadSec:N1} s)"; continue }
+    # let the engine settle (the first request also pays a warm-up cost)
     try {
         $body = '{"prompt":"hi","n_predict":1,"temperature":0.0,"stream":false}'
         Invoke-WebRequest -Uri "http://127.0.0.1:$port/completion" -Method POST -Body $body `

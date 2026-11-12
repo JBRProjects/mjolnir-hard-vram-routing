@@ -162,12 +162,14 @@ def main():
                 break
         return chosen, total
 
-    def p_cascade_verified(r):
+    def p_cascade_verified(r, switch_ms=None):
         tiers = r.get("tiers", {})
         contents = {t: artifact(r, t) for t in TIER_ORDER}
         lat = {t: (tiers.get(t) or {}).get("latency_ms", 0) for t in TIER_ORDER}
-        return cascade.cascade_verified(r.get("task", ""), contents, lat, r.get("fn"), r.get("tests"))
+        return cascade.cascade_verified(r.get("task", ""), contents, lat, r.get("fn"),
+                                        r.get("tests"), switch_ms)
 
+    switch_costs = cascade.load_switch_costs()
     import random as _r
     _r.seed(0)
     pts = {
@@ -178,6 +180,11 @@ def main():
         "learned": eval_policy(lambda r: preds.get(r.get("id"), "turbo"), False) if preds else (0.0, 0.0),
         "oracle": eval_policy(lambda r: r["oracle"], False),
     }
+    if switch_costs:
+        pts["cascade (verified gate + tier switch)"] = eval_policy(
+            lambda r: p_cascade_verified(r, switch_costs), True)
+        A(f"\nMeasured tier load/eviction cost (ms): "
+          + ", ".join(f"{t}={switch_costs[t]:.0f}" for t in TIER_ORDER if t in switch_costs) + "\n")
     q_floor, q_ceil = pts["random"][1], pts["oracle"][1]
     A("\n### Router comparison (held-out test split)\n")
     A("| policy | avg cost (ms) | quality | oracle-gap captured (%) |")

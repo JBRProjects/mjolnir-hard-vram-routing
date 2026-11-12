@@ -1,0 +1,9 @@
+﻿{
+    "eval_ctx":  2048,
+    "measured_at":  "2026-11-11T22:13:26.8379896-05:00",
+    "load_seconds":  {
+                         "ultra":  11.31,
+                         "turbo":  3.88,
+                         "vector":  11.26
+                     }
+}
