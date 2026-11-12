@@ -60,9 +60,24 @@ detail and the judge verdict when available.
 |---|---|
 | `router/learned_preds.jsonl` | learned router predictions per test id (`{id, pred, oracle}`) |
 | `router/budget_curve.json` | cost-aware learned router's quality/cost frontier (`lambda` sweep) |
+| `analysis/results.json` | machine-readable snapshot of every published number (see "Verification") |
 | `analysis/table.md` | policy comparison, per-task quality, oracle distribution, frontier |
 | `analysis/report.md` | the full report regenerated from live data (`analysis/report.py`) |
 | `analysis/cost_quality.png` | the cost-vs-quality plot (core figure) |
+| `harness/switch_cost.json` | measured tier eviction+load cost per tier (`measure_switch.ps1`) |
+
+## Verification
+
+The published numbers are not hand-copied: they are regenerated from the
+committed data and checked in CI.
+
+```
+python analysis/verify_results.py            # recompute the analysis tables and
+                                             # compare with analysis/results.json
+python analysis/verify_results.py --rescore  # also re-run the metric on the
+                                             # committed oracle data (~3 min) and
+                                             # check it reproduces the committed scores
+```
 
 ## Engine logs
 

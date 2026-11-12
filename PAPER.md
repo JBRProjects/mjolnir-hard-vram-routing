@@ -156,10 +156,15 @@ the cheap-feature classifier does not have: a task-specific verifier (unit
 tests) and an explicit per-tier correctness probability with a cost term.
 
 *Memory-eviction robustness.* Only one tier is resident at a time, so tier
-switching is a real cost that the latency measurement includes; a future cycle
-should add the swap cost explicitly. The v2 run also shows the cost profile
-itself is prompt-dependent (vector went from 36.0 s to 49.6 s on the harder
-v2 prompt set), which matters for any budget-aware router.
+switching is a real cost that the latency measurement alone does not include.
+We measured it (`harness/measure_switch.ps1`): making a tier resident takes
+3.9 s (turbo), 11.3 s (vector) and 11.3 s (ultra) at the evaluation operating
+point. Charging that per escalation moves the verified cascade from 34985.9 ms
+to 38329.6 ms at unchanged quality (0.890, 82.4% of the oracle gap): eviction
+degrades routing *gracefully* here, but only because the models are small
+enough to load in seconds and there are three of them. The v2 run also shows
+the cost profile itself is prompt-dependent (vector went from 36.0 s to 49.6 s
+on the harder v2 prompt set), which matters for any budget-aware router.
 
 *Next cycle.* (i) a judge-based secondary metric over the full v2 set - but
 cycle 2 showed the tiers cannot serve as judges (they are completion-style

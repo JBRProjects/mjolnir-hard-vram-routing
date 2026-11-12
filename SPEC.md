@@ -16,7 +16,7 @@ This also avoids the most common failure mode of this kind of project: routing p
 
 > Under a fixed memory budget, does a lightweight, learned per-query routing policy over heterogeneous model tiers achieve meaningfully better cost-quality tradeoffs than static or heuristic routing — and how much of the theoretical (oracle) gain does it actually capture?
 
-Secondary question, if time allows: does routing accuracy degrade gracefully or catastrophically as memory pressure forces tier eviction (i.e., not all tiers resident at once)?
+Secondary question, if time allows: does routing accuracy degrade gracefully or catastrophically as memory pressure forces tier eviction (i.e., not all tiers resident at once)? *Cycle 2 measurement:* the eviction cost is now measured (`harness/measure_switch.ps1`: turbo 3.9 s, vector 11.3 s, ultra 11.3 s to make a tier resident at `-c 2048`). Charging it per escalation moves the verified cascade from 34985.9 ms to 38329.6 ms at unchanged quality (0.890, 82.4% of the oracle gap) - i.e. on this testbed eviction degrades routing *gracefully*, but the numbers must carry the term.
 
 ## 4. Formalization
 
