@@ -25,6 +25,8 @@ harness/tier_*.log
 scoring/scores.jsonl
 scoring/scores_smoke.jsonl
 scoring/scores_smoke_v2.jsonl
+scoring/scores_v2.jsonl
+scoring/scores_v2_judge.jsonl
 scoring/scores_v2_legacy.jsonl
 scoring/scores_*_merged.jsonl
 router/learned_preds.jsonl
