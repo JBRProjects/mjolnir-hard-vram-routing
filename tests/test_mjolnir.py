@@ -130,6 +130,11 @@ def test_routers():
     tier, cost = cascade_verified("code_gen", bad, lat, "add", [{"args": [1, 2], "expected": 3}])
     check("verified cascade escalates and pays for every attempt",
           tier == "ultra" and cost == 6000.0, f"{tier} {cost}")
+    # measured eviction/load cost is charged per escalation
+    tier, cost = cascade_verified("code_gen", bad, lat, "add", [{"args": [1, 2], "expected": 3}],
+                                  switch_ms={"vector": 11260.0, "ultra": 11310.0})
+    check("verified cascade charges the measured tier switch",
+          tier == "ultra" and cost == 6000.0 + 11260.0 + 11310.0, f"{tier} {cost}")
     check("gate rejects prose for code", not gate("code_gen", "no code", "add", [{"args": [1], "expected": 1}]))
     check("gate accepts an answer for QA", gate("factual_qa", "Answer: Paris"))
 
