@@ -29,6 +29,7 @@ eval_prompts/  # build_prompts.py      -> cycle-1 set (180 rows, 20 distinct ite
                # build_legacy_gold.py  -> gold + tests for the cycle-1 base items
 harness/       # run_oracle.py  - all tiers x all prompts, latency + output
                # run_cycle2.ps1 - scripted live cycle for the v2 prompt set
+               # finalize_cycle2.ps1 - merge + score + train + plot + report in one go
 scoring/       # score.py      - correctness primary (metric v2), judge secondary
                # extract.py    - format-neutral answer/code extraction + semantic matching
                # exec_tests.py - sandboxed execution of candidate code against unit tests
@@ -41,7 +42,12 @@ tests/         # test_mjolnir.py - unit checks (also run in CI)
 SPEC.md        # full spec
 RESULTS.md     # numbers as they land
 PAPER.md       # working-paper draft (the narrative)
+DATA.md        # manifest of the committed live measurements (off-site backup)
 ```
+
+The live measurements are committed (raw completions, scores, figures, engine
+logs) so the only copy of the hardware data is not the local disk - see
+`DATA.md` for the manifest and how each file was produced.
 
 ## Quality metric (v2)
 

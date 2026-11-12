@@ -1,0 +1,72 @@
+[
+ {
+  "lambda": 0.0,
+  "cost_ms": 50361.61354074102,
+  "quality": 0.8719135802469137,
+  "mix": {
+   "turbo": 0,
+   "vector": 0,
+   "ultra": 54
+  }
+ },
+ {
+  "lambda": 0.05,
+  "cost_ms": 36979.8639425925,
+  "quality": 0.8719135802469137,
+  "mix": {
+   "turbo": 25,
+   "vector": 0,
+   "ultra": 29
+  }
+ },
+ {
+  "lambda": 0.1,
+  "cost_ms": 30698.960775925687,
+  "quality": 0.8904320987654322,
+  "mix": {
+   "turbo": 36,
+   "vector": 0,
+   "ultra": 18
+  }
+ },
+ {
+  "lambda": 0.2,
+  "cost_ms": 23542.2282481482,
+  "quality": 0.7731481481481481,
+  "mix": {
+   "turbo": 49,
+   "vector": 0,
+   "ultra": 5
+  }
+ },
+ {
+  "lambda": 0.4,
+  "cost_ms": 20756.972903703743,
+  "quality": 0.7731481481481481,
+  "mix": {
+   "turbo": 54,
+   "vector": 0,
+   "ultra": 0
+  }
+ },
+ {
+  "lambda": 0.8,
+  "cost_ms": 20756.972903703743,
+  "quality": 0.7731481481481481,
+  "mix": {
+   "turbo": 54,
+   "vector": 0,
+   "ultra": 0
+  }
+ },
+ {
+  "lambda": 1.6,
+  "cost_ms": 20756.972903703743,
+  "quality": 0.7731481481481481,
+  "mix": {
+   "turbo": 54,
+   "vector": 0,
+   "ultra": 0
+  }
+ }
+]

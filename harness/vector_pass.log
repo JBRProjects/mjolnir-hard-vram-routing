@@ -1,0 +1,22 @@
+[harness] turbo http://127.0.0.1:8080 not healthy: HTTPConnectionPool(host='127.0.0.1', port=8080): Max retries exceeded with url: /health (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8080): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it"))
+[harness] ultra http://127.0.0.1:8082 not healthy: HTTPConnectionPool(host='127.0.0.1', port=8082): Max retries exceeded with url: /health (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8082): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it"))
+[harness] health: {'turbo': False, 'vector': True, 'ultra': False}
+[harness] 10/180 prompts done
+[harness] 20/180 prompts done
+[harness] 30/180 prompts done
+[harness] 40/180 prompts done
+[harness] 50/180 prompts done
+[harness] 60/180 prompts done
+[harness] 70/180 prompts done
+[harness] 80/180 prompts done
+[harness] 90/180 prompts done
+[harness] 100/180 prompts done
+[harness] 110/180 prompts done
+[harness] 120/180 prompts done
+[harness] 130/180 prompts done
+[harness] 140/180 prompts done
+[harness] 150/180 prompts done
+[harness] 160/180 prompts done
+[harness] 170/180 prompts done
+[harness] 180/180 prompts done
+[harness] wrote harness\oracle_vector.jsonl (180 prompts, 180 successful tier-runs)
